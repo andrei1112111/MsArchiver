@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 
-
 // проверка включения последовательности в 'словарь'
 int stc_in_dict (const unsigned char *str, unsigned char ch, unsigned char **dict, unsigned int dict_len, unsigned int str_len) {
     // строкой названа последовательность байтов
