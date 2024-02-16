@@ -2,146 +2,148 @@
 #include <stdlib.h>
 
 
-// проверка включения последовательности в 'словарь'
-int stc_in_dict (const unsigned char *str, unsigned char ch, unsigned char **dict, unsigned int dict_len, unsigned int str_len) {
-    // строкой названа последовательность байтов
-    if (str_len == 0) {return 1;}
-    unsigned int i, j;
-    for (i = 256; i < dict_len; ++i) {
-        if (dict[i][0] == (str_len + 1) && dict[i][dict[i][0]] == ch) {
-            for (j = 0; j <= str_len; ++j) {
-                // совпало
-                if (j == str_len) {
-                    return 1;
-                }
-                // очевидно различны
-                if (str[j] != dict[i][j + 1]) {
-                    break;
-                }
-            }
+// сжатие реализованно при помощи префиксного дерева
+// vertex_id - индекс в массиве ('порядковый номер' фразы в списке всех фраз)
+// pVertex - список возможных 'путей'
+struct Vertex {
+    unsigned long long int vertex_id;
+    struct Vertex *pVertex[256];
+};
+
+// добавление 'фразы' в дерево
+void add_vertex(struct Vertex *root, struct Vertex *arrVertex, unsigned long long int *lVertex, const unsigned char *key , unsigned int len_key) {
+    unsigned int i;
+    struct Vertex *cur = root;
+    for (i = 0; i < len_key; i++) {
+        if (cur->pVertex[key[i]] == NULL) {
+            arrVertex[*lVertex].vertex_id = *lVertex;
+            for (int j = 0; j < 256; ++j) {arrVertex[i].pVertex[j] = NULL;}
+            cur->pVertex[key[i]] = &arrVertex[*lVertex];         // ОШИБКА В ТОМ ЧТО ПРИ РЕЛОВКАЦИИ АДРЕСА СЛЕТАЮТ ЧЕ С ЭТИМ ДЕЛАТЬ А
+            *lVertex = *lVertex + 1;
         }
+        cur = cur->pVertex[key[i]];
     }
-    return 0;
 }
 
-unsigned int get_dict(unsigned char **dict, unsigned int dict_len, unsigned char *str, unsigned int str_len) {
-    if (str_len == 1) {return (str[0] + 1);}
-    unsigned int i, j;
-    for (i = 256; i < dict_len; ++i) {
-        if (dict[i][0] == str_len) {
-            for (j = 0; j < str_len; ++j) {
-                // очевидно различны
-                if (str[j] != dict[i][j + 1]) {
-                    break;
-                }
-                // совпало
-                if ((j + 1) == str_len) {
-                    return (i + 1);
-                }
-            }
+// поиск 'фразы' в дереве
+// возвращает индекс в массиве ('порядковый номер' фразы в списке всех фраз) (фразы не нашлось - (0), нашлась - (номер + 1))
+unsigned int find_vertex(struct Vertex *root, const unsigned char *key, unsigned long long int len_key) {
+    unsigned char j;
+    struct Vertex *cur = root;
+    for (unsigned int i = 0; i < len_key; ++i) {
+        j = (unsigned char)key[i];
+        cur = cur->pVertex[j];
+        if (cur == NULL) {
+            return 0;
         }
     }
-    return 0;
+    return (cur->vertex_id + 1);
 }
 
-
-// lzw для байтовых последовательностей (сжатие)
-// преобразование списка байтов в список некоторых 'чисел'
-unsigned int *lzw_encode(unsigned char *input, unsigned long long int size_inp, unsigned long long int *result_len) {
-    int mxk = 0; // FOR TESTING
-    unsigned int len_key = 0;
-    unsigned char *key = malloc(sizeof(char ) * 256); // определение 'строки'-ключа
-    // словарь состоит из длины (пока что первый байт) и самой последовательности далее
-    unsigned int dict_len = 256; unsigned int dict_mem_step = 8192; unsigned int mem_for_dict = 8192;
-    unsigned char **dict = malloc(sizeof(unsigned char *) * mem_for_dict); // определение 'словаря'
-    // заполнение словаря всевозможными значениями
-    for (int i = 0; i < 256; ++i) { dict[i] = malloc(sizeof(char ) * 2) ; dict[i][0] = 1; dict[i][1] = (char )i;}
-    // результат (непонятно сколько памяти держать под каждое значение (типа тип инта))
-    unsigned int res_len = 0; unsigned int res_mem_step = 4096; unsigned int mem_for_res = 4096;
-    unsigned int *res = malloc(sizeof(unsigned int) * mem_for_res); // сжатая последовательность
+// lzw для байтовых последовательностей (сжатие при помощи префиксного дерева)
+// максимальный размер входных данных - (18 446 744 073 709 551 615 байт) == (16,7 терабайта)
+// возвращает массив 'чисел' - кодов всех (без потерь) фраз
+unsigned long long int *lzw_encode(const unsigned char *input, unsigned long long int size_inp, unsigned long long int *result_len) {
+    // определение строки-фразы
+    unsigned long long int len_key = 0;
+    unsigned long long int key_mem_step = 256; unsigned long long int mem_for_key = 256;
+    unsigned char *key = malloc(sizeof(unsigned char ) * mem_for_key);
+    // определение дерева для хранения фраз
+    unsigned long long int lVertex = 256;
+    unsigned long long int vert_mem_step = 8192; unsigned long long int mem_for_vert = 8192;
+    struct Vertex root;
+    struct Vertex *arrVertex = malloc(sizeof(struct Vertex) * mem_for_vert);
+    // предзаполнение корня всеми возможными символами (диапазон char)
+    for (int j = 0; j < 256; ++j) {root.pVertex[j] = NULL;}
+    for (int i = 0; i < 256; ++i) {
+        arrVertex[i].vertex_id = i;
+        for (int j = 0; j < 256; ++j) {arrVertex[i].pVertex[j] = NULL;} // символ = номер символа в pVertex
+        root.pVertex[i] = &arrVertex[i];
+    }
+    // результат (жрет много памяти)       // !WORK! Возможно стоит сделать условие выбора разных типов, если предполагать что res_len <= in
+    unsigned long long int res_len = 0;
+    unsigned long long int res_mem_step = 4096; unsigned long long int mem_for_res = 4096;
+    unsigned long long int *res = malloc(sizeof(unsigned long long int) * mem_for_res); // коды фраз, результат работы функции lzw_encode
 
     for (unsigned int inp_byte = 0; inp_byte < size_inp; ++inp_byte) { // проход по байтам 'input'
-        if (stc_in_dict(key, input[inp_byte], dict, dict_len, len_key) == 1) { // (w+c) in dict
-            // key = key + input[inp_byte]
-            key[len_key] = input[inp_byte];
-            ++len_key;
-        } else {
-            if ((dict_len + 1) > mem_for_dict) { // память под словарь кончилась
-                mem_for_dict = mem_for_dict + dict_mem_step;
-                dict = (unsigned char **) realloc(dict, mem_for_dict * sizeof(unsigned char *));
-//                printf("dict: %d\n", mem_for_dict);
-                if (dict == NULL) {
-                    fprintf(stderr, "Memory allocation error\n");
+        if ((len_key + 1) >= mem_for_key) { // в key памяти не хватит под добавление нового символа
+            mem_for_key = mem_for_key + key_mem_step;
+            key = realloc(key, mem_for_key * sizeof(unsigned char ));
+            if (key == NULL) {
+                fprintf(stderr, "Memory allocation error at ->encoding ->for ->key\n");
+                free(arrVertex); free(key); free(res);
+                exit(1);
+            }
+        }
+        key[len_key] = input[inp_byte]; ++len_key; // [key] = key+input[inp_byte]
+        if (find_vertex(&root, key, len_key) == 0) { // проверка (key+input[inp_byte]) не в dict
+            if ((lVertex + 1) > mem_for_vert) { // память под дерево кончилась
+                mem_for_vert = mem_for_vert + vert_mem_step;
+                arrVertex = (struct Vertex *) realloc(arrVertex, mem_for_vert * sizeof(struct Vertex));
+                if (arrVertex == NULL) {
+                    fprintf(stderr, "Memory allocation error at ->encoding ->for ->arrVertex\n");
+                    free(arrVertex); free(key); free(res);
                     exit(1);
                 }
             }
             if ((res_len + 1) > mem_for_res) { // память под результат кончилась
                 mem_for_res = mem_for_res + res_mem_step;
-                res = realloc(res, mem_for_res * sizeof(unsigned int));
+                res = realloc(res, mem_for_res * sizeof(unsigned long long int));
                 if (res == NULL) {
-                    fprintf(stderr, "Memory allocation error\n");
+                    fprintf(stderr, "Memory allocation error at ->encoding ->for ->res\n");
+                    free(arrVertex); free(key); free(res);
                     exit(1);
                 }
             }
-            // result.append(dictionary[w])
-            res[res_len] = get_dict(dict, dict_len, key, len_key)-1;
-//            printf("%d\n", res[res_len]);
-            if (res[res_len] > 65536) {printf("Большая длинна (90 строка)\n"); exit(1);} // хватит два байта
+            // result.append(dictionary[key])
+            res[res_len] = find_vertex(&root, key, (len_key-1))-1;
             ++res_len;
-            // dict[dict_len] = (key+input[inp_byte])
-            if (len_key + 1 <= 255) {
-                dict[dict_len] = malloc(sizeof(char ) * (len_key + 2));
-                for (unsigned int i = 0; i < len_key; ++i) {dict[dict_len][i+1] = key[i];}
-                if (len_key > mxk) { mxk = len_key;} // FOR TESTING
-                dict[dict_len][len_key + 1] = input[inp_byte]; dict[dict_len][0] = (unsigned char )(len_key + 1); // типа длинна в нулевом байте
-                ++dict_len;
-            }
+            // dictionary.append(key+input[inp_byte])
+            add_vertex(&root, arrVertex, &lVertex, key, len_key);
            // key = input[inp_byte]
             key[0] = input[inp_byte]; len_key = 1;
         }
     }
-    if (size_inp > 0) {
+    if (len_key != 0) { // key не пустой
         if ((res_len + 1) > mem_for_res) { // память под результат кончилась
             mem_for_res = mem_for_res + res_mem_step;
-            res = realloc(res, mem_for_res * sizeof(unsigned int));
+            res = realloc(res, mem_for_res * sizeof(unsigned long long int));
             if (res == NULL) {
-                fprintf(stderr, "Memory allocation error\n");
+                fprintf(stderr, "Memory allocation error at ->encoding ->main ->res\n");
+                free(arrVertex); free(key); free(res);
                 exit(1);
             }
         }
-        // result.append(dictionary[w])
-        res[res_len] = get_dict(dict, dict_len, key, len_key)-1;
+        // result.append(dictionary[key])
+        res[res_len] = (find_vertex(&root, key, len_key)-1);
         ++res_len;
     }
     *result_len = res_len;
-    for (unsigned int i = 0; i < dict_len; ++i) {
-        free(dict[i]);
-    }
-    free(dict);
-    free(key);
-    printf("DEBUG -- mxk: %d\n", mxk);
+    free(arrVertex); free(key);
     return res;
 }
 
 
-char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned long long int *result_len) {
-    unsigned int len_key = 0; unsigned int key_mem_step = 4096; unsigned int mem_for_key = 4096;
+// lzw для байтовых последовательностей (Декодирование при помощи Массива строк)
+// принимает последовательность чисел-кодов и возвращает исходную последовательность (без потерь)
+char *lzw_decode(const unsigned long long int *input, unsigned long long int size_inp, unsigned long long int *result_len) {
+    unsigned long long int len_key = 0; unsigned long long int key_mem_step = 4096; unsigned long long int mem_for_key = 4096;
     unsigned char *key = malloc(sizeof(unsigned char ) * mem_for_key); // определение 'строки'-ключа
-    unsigned int len_entry = 0; unsigned int entry_mem_step = 4096; unsigned int mem_for_entry = 4096;
+    unsigned long long int len_entry = 0; unsigned long long int entry_mem_step = 4096; unsigned long long int mem_for_entry = 4096;
     unsigned char *entry = malloc(sizeof(unsigned char ) * mem_for_entry); // определение entry
     // словарь состоит из длины (пока что первый байт) и самой последовательности далее
-    unsigned int dict_len = 256; unsigned int dict_mem_step = 4096; unsigned int mem_for_dict = 4096;
+    unsigned long long int dict_len = 256; unsigned long long int dict_mem_step = 4096; unsigned long long int mem_for_dict = 4096;
     unsigned char **dict = malloc(sizeof(unsigned char *) * mem_for_dict); // определение 'словаря'
     // заполнение словаря всевозможными значениями
     for (int i = 0; i < 256; ++i) { dict[i] = malloc(sizeof(unsigned char ) * 2) ; dict[i][0] = 1; dict[i][1] = (unsigned char )i;}
     // результат (непонятно сколько памяти держать под каждое значение (типа тип инта))
-    unsigned int res_len = 0; unsigned int res_mem_step = 4096; unsigned int mem_for_res = 4096;
-    unsigned char *res = malloc(sizeof(unsigned int) * mem_for_res); // сжатая последовательность
+    unsigned long long int res_len = 0; unsigned long long int res_mem_step = 4096; unsigned long long int mem_for_res = 4096;
+    unsigned char *res = malloc(sizeof(unsigned char ) * mem_for_res); // сжатая последовательность
 
     key[0] = (unsigned char )input[0]; len_key = 1;
     res[res_len] = (unsigned char )input[0];
     ++res_len;
-    for (unsigned int inp_int = 1; inp_int < size_inp; ++inp_int) { // проход по интам 'input'}
+    for (unsigned long long int inp_int = 1; inp_int < size_inp; ++inp_int) { // проход по интам 'input'}
         if (input[inp_int] < dict_len) { // input[inp_int] in dict
             if ((dict[input[inp_int]][0]) >= mem_for_entry) { // в entry памяти не хватит
                 while ((dict[input[inp_int]][0]) >= mem_for_entry) {
@@ -154,7 +156,7 @@ char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned 
                 }
             }
             len_entry = dict[input[inp_int]][0];
-            for (unsigned int i = 0; i < len_entry; ++i) {entry[i] = dict[input[inp_int]][i+1];}
+            for (unsigned long long int i = 0; i < len_entry; ++i) {entry[i] = dict[input[inp_int]][i+1];}
         } else if (input[inp_int] == dict_len) {
             if ((len_key + 1) >= mem_for_entry) { // в entry памяти не хватит
                 mem_for_entry = mem_for_entry + entry_mem_step;
@@ -166,7 +168,7 @@ char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned 
             }
             // entry = key + key[0]
             len_entry = len_key;
-            for (unsigned int i = 0; i < len_key; ++i) {entry[i] = key[i];}
+            for (unsigned long long int i = 0; i < len_key; ++i) {entry[i] = key[i];}
             entry[len_entry] = key[0];
             ++len_entry;
         } else {
@@ -182,7 +184,7 @@ char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned 
                 exit(1);
             }
         }
-        for (unsigned int i = 0; i < len_entry; ++i) { // res += entry
+        for (unsigned long long int i = 0; i < len_entry; ++i) { // res += entry
             res[res_len+i] = entry[i];
         }
         res_len += len_entry;
@@ -198,7 +200,7 @@ char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned 
 //        dictionary[dict_size] = w + entry[0]
         dict[dict_len] = malloc(sizeof(unsigned char ) * (len_key + 1 + 1));
         dict[dict_len][0] = (char )(len_key + 1); // как раз слабый момент храния длинны в нулевом байте (1.)
-        for (unsigned int i = 0; i < len_key; ++i) {dict[dict_len][i+1] = key[i];}
+        for (unsigned long long int i = 0; i < len_key; ++i) {dict[dict_len][i+1] = key[i];}
         dict[dict_len][1+len_key] = entry[0];
         ++dict_len;
 
@@ -216,17 +218,17 @@ char *lzw_decode(unsigned int *input, unsigned long long int size_inp, unsigned 
         len_key = len_entry;
     }
     *result_len = res_len;
-    for (unsigned int i = 0; i < dict_len; ++i) {free(dict[i]);}
+    for (unsigned long long int i = 0; i < dict_len; ++i) {free(dict[i]);}
     free(entry); free(key); free(dict);
     return res;
 }
 
 
-int main() {
+int main(void) {
     unsigned long long int size;
     unsigned long long int len_encoded, len_decoded;
 // --------------------------
-    FILE* file = fopen("2638.txt", "r");
+    FILE* file = fopen("2638_27500.txt", "r");
     fseek(file, 0, SEEK_END);
     size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -234,17 +236,20 @@ int main() {
     fread(input, sizeof(char), size, file);
     fclose(file);
 // --------------------------
-    unsigned int *encoded = lzw_encode(input, size, &len_encoded);
+    unsigned long long int *encoded = (unsigned long long int *) lzw_encode(input, size, &len_encoded);
 //    return 0;
+
     printf("Длинна исходной(байт): %llu. Длинна сжатой('чисел'): %llu\n", size, len_encoded);
 
     unsigned char *decoded = lzw_decode(encoded, len_encoded, &len_decoded);
 
+//    for (unsigned int i = 0; i < len_encoded; ++i) { printf("%llu ", encoded[i]); } printf("\n");
+//    for (unsigned int i = 0; i < len_decoded; ++i) { printf("%c", decoded[i]); } printf("\n");
+
     printf("Символов: %llu\n", len_decoded);
     printf("Исходная == Декодированная: ");
     int h = 1;
-//    if (len_decoded == size) {
-    if (1 == 1) {
+    if (len_decoded == size) {
         for (unsigned int i = 0; i < len_decoded; ++i) {
             if (input[i]!= decoded[i]) {
                 printf("\n%d != %d (%d)\n", input[i], decoded[i], i);
@@ -263,8 +268,9 @@ int main() {
 // 11.02 -- 90!
 // 12.02 -- 150! рабочий алгоритм кодирования LZW на вложенном массиве
 // 14.02 -- 270! декодирование LZW на вложенном массиве (2638.txt)
-//               1. Словарь хранит длинну в первом символе. Реализовать длинну в первых четырех.
-//               2. алгоритм на префиксном дереве https://ru.algorithmica.org/cs/string-structures/trie/ https://habr.com/ru/companies/otus/articles/674378/ https://ru.wikipedia.org/wiki/Алгоритм_Лемпеля_—_Зива_—_Велча
+// 15ю02 -- 270! префиксное дерево
+
+//              1. Словарь хранит длинну в первом символе. Реализовать длинну в первых четырех.
+
 
 // /usr/bin/time -al ./mlza
-// (5477177005 инструкций; 1,93 мб; 1.28 с; 2638.txt; Исходно байт: 50656; Выход байт: [14533*2])
