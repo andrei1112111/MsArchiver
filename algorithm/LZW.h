@@ -1,8 +1,11 @@
-#ifndef MLZA_LZW_H
-#define MLZA_LZW_H
+#ifndef MLZ_LZW_H
+#define MLZ_LZW_H
 
-unsigned long long int *lzw_encode(const unsigned char *input, unsigned long long int size_inp, unsigned long long int *result_len);
+#define uint64 unsigned long long int
+#define uchar unsigned char
 
-unsigned char *lzw_decode(const unsigned long long int *input, unsigned long long int size_inp, unsigned long long int *result_len);
 
-#endif //MLZA_LZW_H
+uint64 *lzwEncode(const uchar *input, uint64 size_inp, volatile uint64 *result_len);
+uchar *lzwDecode(const uint64 *input, uint64 size_inp, volatile uint64 *result_len);
+
+#endif //MLZ_LZW_H
