@@ -4,11 +4,12 @@
 #define uint64 unsigned long long int
 #define uchar unsigned char
 
+// https://ru.wikipedia.org/wiki/Алгоритм_Лемпеля_—_Зива_—_Велча
 
 // сжатие реализованно при помощи префиксного дерева
 // vertex_id - индекс в массиве ('порядковый номер' фразы в списке всех фраз)
 // pVertex - список возможных 'путей'
-struct Vertex {
+struct Vertex { // 2064 байт
     uint64 vertex_id;
     uint64 pVertex[257];
 };
@@ -122,6 +123,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, volatile uint64 *re
     }
     *result_len = res_len;
     free(arrVertex); free(key);
+//    printf("%lu %llu", sizeof(struct Vertex), res_len); !!!
     return res;
 }
 

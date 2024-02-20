@@ -9,4 +9,4 @@ add_executable(mlz main.c
         algorithm/file.h
         algorithm/file.c
         algorithm/test.c
-        algorithm/test.h)
+)

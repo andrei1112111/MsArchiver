@@ -4,8 +4,12 @@
 #define uint64 unsigned long long int
 #define uchar unsigned char
 
+char fCheck(const char *filename);
+char exCheck(const char *filename);
+char askUser(void);
 
-uchar *fLoad(const char *filename, volatile uint64 *size);
-char fSave(const char *filename, const uchar *data, uint64 size);
+void fGetContent(char **filenames, uint64 fCount, char skip);
+void fArcData(char **filenames, uint64 fCount, char skip);
+void fDArkData(char **filenames, uint64 fCount, char skip);
 
 #endif //MLZ_FILE_H
