@@ -58,15 +58,39 @@ int main(int argc, char **argv) {
             if (inp1 == 'y' || inp1 == 'Y') { skip = 1; break;}
             if (inp1 == 'n' || inp1 == 'N') { break;}
         } while (1);
-        files = (char **) malloc(sizeof(char **) * argc);
+        files = (char **) malloc(sizeof(char **) * 256);
         char *inp2 = malloc(sizeof(char) * 256);
         printf("Enter the names of the files to be archived separated by newlines:\n");
         scanf("%s", inp2);
         while (inp2[0] != '\0') {
-            files[fileCount] = inp2;
+            if (workMod == wInfo || workMod == wDearchiving) { // проверка расширения
+                if (exCheck(inp2) == 0) {
+                    if (skip == 0) {
+                        fprintf(stderr, "This file has an invalid extension: %s\n", inp2);
+                        if (askUser() == 0) {
+                            return 0;
+                        } else {
+                            continue; // не подошел по расширению
+                        }
+                    }
+                }
+            }
+            if (fCheck(inp2) == 0) { // файл не найден
+                if (skip == 0) {
+                    fprintf(stderr, "This file already exists: %s\n", inp2);
+                    if (askUser() == 0) {
+                        return 0;
+                    } else {
+                        continue;
+                    }
+                }
+            }
+            int lf = 0; for (; inp2[lf] != '\0'; ++lf) {}
+            files[fileCount] = malloc(sizeof(char) * (lf + 1));
+            for (int i = 0; i < lf+1; ++i) { files[fileCount][i] = inp2[i];}
+            ++fileCount;
             scanf("%s", inp2);
         }
-
     } else { // Работа с аргументами командной строки
         for (int i = 1; i < argc; ++i) { // если поступило сразу несколько команд - будет выполнена последняя из них
             if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) { // выводим справку
@@ -127,7 +151,9 @@ int main(int argc, char **argv) {
                         }
                     }
                 }
-                files[fileCount] = argv[fileCount]; // !!! ЭТО ТАК НЕ РАОТАЕТ
+                int lf = 0; for (; argv[fileCount][lf] != '\0'; ++lf) {}
+                files[fileCount] = malloc(sizeof(char) * (lf + 1));
+                for (int ii = 0; ii < lf+1; ++ii) { files[fileCount][i] = argv[fileCount][i];}
                 ++fileCount;
             }
         }
@@ -149,3 +175,4 @@ int main(int argc, char **argv) {
     printf("Completed!\n");
     return 0;
 }
+// докрутить безопасности на всем проекте (защита от переполнения типов)
