@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
             printf("Enter the operating mode: ");
             fflush(stdout);
             scanf("%c", &inp1);
+            fflush(stdin);
             switch (inp1) {
                 case '1':
                     workMod = wArchiving;
@@ -50,23 +51,27 @@ int main(int argc, char **argv) {
                     break;
             }
         } while (workMod == wNone);
-        printf("Do you want to see warnings in case of errors?");
+        printf("Do you want to see warnings in case of errors?\n");
         do {
             printf("Type (yes/no): ");
             fflush(stdout);
             scanf("%s", &inp1);
-            if (inp1 == 'y' || inp1 == 'Y') { skip = 1; break;}
-            if (inp1 == 'n' || inp1 == 'N') { break;}
+            fflush(stdin);
+            if (inp1 == 'y' || inp1 == 'Y') { break;}
+            if (inp1 == 'n' || inp1 == 'N') { skip = 1; break;}
         } while (1);
         files = (char **) malloc(sizeof(char **) * 256);
         char *inp2 = malloc(sizeof(char) * 256);
         printf("Enter the names of the files to be archived separated by newlines:\n");
+        printf("When you're done, type 'e'\n");
         scanf("%s", inp2);
-        while (inp2[0] != '\0') {
+        fflush(stdin);
+        while (inp2[0] != 'e' && inp2[1]!= '\0') {
             if (workMod == wInfo || workMod == wDearchiving) { // проверка расширения
                 if (exCheck(inp2) == 0) {
                     if (skip == 0) {
                         fprintf(stderr, "This file has an invalid extension: %s\n", inp2);
+                        fflush(stderr);
                         if (askUser() == 0) {
                             return 0;
                         } else {
@@ -78,14 +83,17 @@ int main(int argc, char **argv) {
             if (fCheck(inp2) == 0) { // файл не найден
                 if (skip == 0) {
                     fprintf(stderr, "This file already exists: %s\n", inp2);
+                    fflush(stderr);
                     if (askUser() == 0) {
                         return 0;
                     } else {
+                        scanf("%s", inp2);
+                        fflush(stdin);
                         continue;
                     }
                 }
             }
-            int lf = 0; for (; inp2[lf] != '\0'; ++lf) {}
+            int lf = 1; for (; inp2[lf] != '\0'; ++lf) {}
             files[fileCount] = malloc(sizeof(char) * (lf + 1));
             for (int i = 0; i < lf+1; ++i) { files[fileCount][i] = inp2[i];}
             ++fileCount;
@@ -172,7 +180,9 @@ int main(int argc, char **argv) {
     if (workMod == wInfo) { // проверка содержимого архива
         fGetContent(files, fileCount, skip);
     }
-    printf("Completed!\n");
+    printf("\nComplete\n");
     return 0;
 }
 // докрутить безопасности на всем проекте (защита от переполнения типов)
+
+// !!! test_files/1.txt

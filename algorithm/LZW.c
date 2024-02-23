@@ -15,7 +15,7 @@ struct Vertex { // 2064 байт
 };
 
 // добавление 'фразы' в дерево
-void add_vertex(struct Vertex *root, struct Vertex *arrVertex, volatile uint64 *lVertex, const uchar *key, const uint64 len_key) {
+void add_vertex(struct Vertex *root, struct Vertex *arrVertex, uint64 *lVertex, const uchar *key, const uint64 len_key) {
     uint64 i;
     struct Vertex *cur = root;
     for (i = 0; i < len_key; ++i) {
@@ -49,7 +49,7 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
 // максимальный размер входных данных - (18 446 744 073 709 551 615 байт) == (16,7 терабайта)
 // возвращает массив 'чисел' - кодов всех (без потерь) фраз
 // Результат должен быть освобожден после
-uint64 *lzwEncode(const uchar *input, const uint64 size_inp, volatile uint64 *result_len) {
+uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize) {
     // определение строки-фразы
     uint64 len_key = 0; uint64 key_mem_step = 256; uint64 mem_for_key = 256;
     uchar *key = malloc(sizeof(uchar ) * mem_for_key);
@@ -122,6 +122,11 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, volatile uint64 *re
         ++res_len;
     }
     *result_len = res_len;
+    if (lVertex >= 4294967285) {
+        *uSize = 8;
+    } else {
+        *uSize = 4;
+    }
     free(arrVertex); free(key);
 //    printf("%lu %llu", sizeof(struct Vertex), res_len); !!!
     return res;
@@ -131,7 +136,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, volatile uint64 *re
 // lzw для байтовых последовательностей (Декодирование при помощи Массива строк)
 // принимает последовательность чисел-кодов и возвращает исходную последовательность (без потерь)
 // Результат должен быть освобожден после
-uchar *lzwDecode(const uint64 *input, const uint64 size_inp, volatile uint64 *result_len) {
+uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len) {
     // определение 'строки'-ключа
     uint64 len_key; uint64 key_mem_step = 4096; uint64 mem_for_key = 4096;
     uchar *key = malloc(sizeof(uchar ) * mem_for_key);

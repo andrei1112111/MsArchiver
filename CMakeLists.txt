@@ -8,5 +8,4 @@ add_executable(mlz main.c
         algorithm/LZW.h
         algorithm/file.h
         algorithm/file.c
-        algorithm/test.c
 )
