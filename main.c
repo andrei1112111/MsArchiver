@@ -75,6 +75,8 @@ int main(int argc, char **argv) {
                         if (askUser() == 0) {
                             return 0;
                         } else {
+                            scanf("%s", inp2);
+                            fflush(stdin);
                             continue; // не подошел по расширению
                         }
                     }
@@ -99,6 +101,7 @@ int main(int argc, char **argv) {
             ++fileCount;
             scanf("%s", inp2);
         }
+        printf("\n\n\n");
     } else { // Работа с аргументами командной строки
         for (int i = 1; i < argc; ++i) { // если поступило сразу несколько команд - будет выполнена последняя из них
             if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) { // выводим справку
@@ -186,3 +189,4 @@ int main(int argc, char **argv) {
 // докрутить безопасности на всем проекте (защита от переполнения типов)
 
 // !!! test_files/1.txt
+// !!! archive.mlz
