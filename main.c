@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
     }
     // работа с данными пользователя
     if (workMod == wArchiving) { // архивация
-        fArcData(files, fileCount, skip);
+        fArcData(files, fileCount);
     }
     if (workMod == wDearchiving) { // разархивация
         fDArkData(files, fileCount, skip);
