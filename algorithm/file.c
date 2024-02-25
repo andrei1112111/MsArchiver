@@ -12,9 +12,15 @@ struct file {
     uint64 size;
 };
 
+// convert 8 chars to uint64
+uint64 convert(const uchar* input) {
+    return *((uint64*)input);
+}
+
+// returns 1 when the input string is a file
 char isFile(const char *filename) {
     if (filename[0] == '-') {return 0;}
-    for (int i = 0; filename[i] != '\0'; i++) {
+    for (int i = 0; filename[i] != '\0'; ++i) {
         if (filename[i] == '.' && filename[i + 1] != '\0') {
             return 1;
         }
@@ -22,7 +28,7 @@ char isFile(const char *filename) {
     return 0;
 }
 
-// Возвращает имя без пути и считает его длину
+// Returns the name without the path and calculates its length
 char *getName(const char *filename, int *len) {
     int i,j = 0;
     for (i = 0; filename[i] != '\0'; ++i) {
@@ -39,7 +45,7 @@ char *getName(const char *filename, int *len) {
     return name;
 }
 
-// создание папки
+// creating a folder with unique name
 char *mkDirectory(const char *name, uint64 *folderLen) {
     int i = 0;
     for (; name[i] != '\0'; ++i) {}
@@ -75,7 +81,7 @@ char *mkDirectory(const char *name, uint64 *folderLen) {
     return newName;
 }
 
-// выбор уникального имени архива
+// choosing a unique name for the archive
 char *uniqName(void) {
     char *filename = malloc(sizeof(char) * 100);
     for (int i = 0; i < 13; ++i) {filename[i] = "archive.mlz\0"[i];}
@@ -118,7 +124,8 @@ void printLB(uint64 cur, uint64 end) {
     fflush(stdout);
 }
 
-// Возвращает строго 11 символов (строка длины 10)
+// Converts file size in bytes to kb mb ...
+// Returns 11 characters (string length = 10)
 char *sizeToStr(uint64 size){
     char syf[6][3] = {"B\0\0", "KB\0", "MB\0", "GB\0", "TB\0", "PB\0"};
     int i = 0;
@@ -136,7 +143,7 @@ char *sizeToStr(uint64 size){
     return str;
 }
 
-// Возвращает 1 если пользователь согласен продолжить без файла, иначе 0
+// Returns 1 if the user agrees to continue without the file, otherwise 0
 char askUser(void) {
     while (1) {
         char answer[1];
@@ -151,16 +158,16 @@ char askUser(void) {
 }
 
 
-// проверяет существование фала
-// 0 - не существует, 1 - существует
+// Checks File Existence
+// 0 - does not exist, 1 - exists
 char fCheck(const char *filename) {
-    FILE *fp = fopen(filename, "r");
+    FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
         return 0;
     }
     return 1;
 }
-// 1 - .mlz файл, иначе 0
+// 1 - .mlz archive, otherwise 0
 char exCheck(const char *filename) {
     int i;
     for (i = 0; filename[i] != '\0'; ++i) {}
@@ -170,19 +177,19 @@ char exCheck(const char *filename) {
     return 0;
 }
 
-// файл будет открыт и прочитан
-// принимает имя файла и указатель на размер файла
-// возвращает указатель на содержимое файла
+// the file will be opened and read
+// accepts the file name, a pointer to the file size, a pointer to the number of files in the archive and the operating mode
+// returns a pointer to the contents of the file
 uchar *fRead(const char *filename, volatile uint64 *fSize, volatile uint64 *dSize, char mode) {
     FILE* file = fopen(filename, "r");
-//     чтение размера файла
+    // reading file size
     fseek(file, 0, SEEK_END);
     *fSize = ftell(file);
     fseek(file, 0, SEEK_SET);
-//     чтение данных файла
+    // reading file data
     uchar *fData = malloc(sizeof(uchar) * *fSize);
     fread(fData, sizeof(uchar), *fSize, file);
-    // проверка ошибок
+    // error checking
     if (ferror(file) != 0) {
         fprintf(stderr, "Error reading file. ->fLoad\n");
         return NULL;
@@ -193,62 +200,55 @@ uchar *fRead(const char *filename, volatile uint64 *fSize, volatile uint64 *dSiz
         return NULL;
     }
     fclose(file);
-    // считать количество файлов (uint64)
+    // count number of files (uint64)
     if (mode == 'a') {
-        uint64 N = 0;
-        uint64 p256n[8] = {1, 256, 65536, 16777216, 4294967296, 1099511627776, 281474976710656, 72057594037927936};
-        for (int i = 7; i >= 0; --i) {
-            N += fData[i] * p256n[i];
-        } // сборка uint64
-        *dSize = N;
+        uchar N[8] = {fData[0], fData[1], fData[2], fData[3], fData[4], fData[5], fData[6], fData[7]}; // assembly uint64
+        *dSize = convert(N);
     }
     return fData;
 }
 
-// Возвращает список строк-имен файлов в .mlz архиве
-// size - список размеров файлов в.mlz архиве. fCount - количество файлов в.mlz архиве.
+// Returns a list of file name strings in the .mlz archive
+// size - list of file sizes in the .mlz archive. fCount - number of files in the .mlz archive.
 struct file *mlzGetNames(const char *filename, uint64 *fCount, char skip) {
-    uint64 start = 8; // начало последовательности файлов
+    uint64 start = 8; // start of file sequence
     uint64 fSize = 0;
-    uchar uSize; // размер Юнета составляющей кодовой единицы данных
+    uchar uSize; // unit size of the component data code unit
     uchar *content = fRead(filename, &fSize, fCount, 'a');
     struct file *Files = malloc(sizeof(struct file) * (*fCount));
-    for (int i = 0; i < *fCount; ++i) { // цикл по файлам
+    for (int i = 0; i < *fCount; ++i) { // cycle through files
         if (content == NULL) {
             if (skip == 0 && askUser() == 0) {
                 return NULL;
             }
         } else {
             unsigned int N;
-            uint64 p256n[8] = {1, 256, 65536, 16777216, 4294967296, 1099511627776, 281474976710656, 72057594037927936};
-            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // сборка uint длинны имени файла
+            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // assembly uint length of file name
             start += 4;
             Files[i].name = malloc(sizeof(uchar) * (N + 1));
-            for (int j = 0; j < N; ++j) { // цикл символам имени файла
+            for (int j = 0; j < N; ++j) { // loop on file name characters
                 Files[i].name[j] = content[start + j];
             }
             Files[i].name[N] = '\0';
             start += N;
-            uSize = content[start]; // размер юнета
+            uSize = content[start]; // unit size
             start += 1;
-            N = 0;
-            for (int j = 0; j < 8; ++j) {
-                N += content[start + j] * p256n[j];
-            } // сборка uint64 длинны длины содержимого файла
+            uchar M[8] = {content[start + 0], content[start + 1], content[start + 2], content[start + 3],
+                          content[start + 4], content[start + 5], content[start + 6], content[start + 7]}; // assembly uint64
+            N = convert(M);
             Files[i].size = N * uSize;
-            start += 8 + (N * uSize);
+            start += 8 + Files[i].size;
         }
-
     }
     free(content);
     return Files;
 }
 
-// Разархивация .mlz в папку
+// Unzipping .mlz into a folder
 char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
     uint64 fCount, fSize, dataSize, dataLen, nameLen;
-    uchar uSize; // размер Юнета составляющей кодовой единицы данных
-    uint64 start = 8; // начало последовательности файлов
+    uchar uSize; // unit size of the component data code unit
+    uint64 start = 8; // start of file sequence
     uchar *decoded;
     char *nameFile;
     uchar *content = fRead(filename, &fSize, &fCount, 'a');
@@ -257,50 +257,45 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
         return 0;
     } else {
         unsigned int N;
-        uint64 p256n[8] = {1, 256, 65536, 16777216, 4294967296, 1099511627776, 281474976710656, 72057594037927936};
         for (uint64 i = 0; i < fCount; ++i) {
-            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // сборка uint длинны имени файла
+            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // assembly uint length of file name
             start += 4;
             nameLen = (N + 1);
-            nameFile = malloc(sizeof(uchar) * nameLen); // файл из архива
-            for (int j = 0; j < N; ++j) { // цикл символам имени файла
+            nameFile = malloc(sizeof(uchar) * nameLen); // archive file
+            for (int j = 0; j < N; ++j) { // loop on file name characters
                 nameFile[j] = (char)content[start + j];
             }
             nameFile[N] = '\0';
             start += N;
-            uSize = content[start]; // размер юнета
+            uSize = content[start]; // unit size
             start += 1;
-            N = 0;
-            for (int j = 0; j < 8; ++j) {
-                N += content[start + j] * p256n[j];
-            } // сборка uint64 длинны длины содержимого файла
+            uchar M[8] = {content[start + 0], content[start + 1], content[start + 2], content[start + 3],
+                          content[start + 4], content[start + 5], content[start + 6], content[start + 7]}; // assembly uint64
+            N = convert(M);
             dataSize = N * uSize;
             start += 8;
-            // -------- муть |
-            uint64 *fileData = malloc(sizeof(uint64) * dataSize); // содержимое файла как uint64
+            // -------- to change |
+            uint64 *fileData = malloc(sizeof(uint64) * dataSize); // file content as uint64
             uint64 kk = 0;
             if (uSize == 4) {
                 for (;kk < N; ++kk) {
                     fileData[kk] = (content[start + (kk * uSize) + 3] << 24) | (content[start + (kk * uSize) + 2] << 16) | (content[start + (kk * uSize) + 1] << 8) | (content[start + (kk * uSize)]);
                 }
             } else {
-                uint64 g;
                 for (; kk < N; ++kk) {
-                    g = 0;
-                    for (int j = 0; j < uSize; ++j) {
-                        g += content[start + kk + j] * p256n[j];
-                        fileData[kk] = g;
+                    uchar MM[8] = {content[start + kk + 0], content[start + kk + 1], content[start + kk + 2], content[start + kk + 3],
+                                  content[start + kk + 4], content[start + kk + 5], content[start + kk + 6], content[start + kk + 7]}; // assembly uint64
+                    fileData[kk] = convert(MM);
                     }
                 }
-            }
             decoded = lzwDecode(fileData, N, &dataLen);
-            // -------- муть /
+            // -------- to change /
             start += (N * uSize);
             if (decoded == NULL) {
                 fprintf(stderr, "Error decoding file. ->mlzGetData (%s)\n", filename);
                 return 0;
             }
-            // запись в файл
+            // write to file
             char *path = malloc(sizeof(char) * (folderLen + nameLen + 2));
             for (int k = 0; k < folderLen; ++k) {
                 path[k] = folder[k];
@@ -322,8 +317,8 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
     return 1;
 }
 
-// Печатает содержимое указанного файла.mlz как список размеров файлов(сжатых) и имен файлов
-// Гарантирует, что все файлы - файлы.mlz
+// Prints the contents of the specified .mlz file as a list of file sizes (compressed) and file names
+// Ensures that all files are .mlz files
 void fGetContent(char **filenames, uint64 fCount, char skip) {
     struct file *Files = NULL; uint64 fCounts = 0;
     for (uint64 i = 0; i < fCount; ++i) {
@@ -331,7 +326,7 @@ void fGetContent(char **filenames, uint64 fCount, char skip) {
         if (Files != NULL) {
             printf("IN %s\n", filenames[i]);
             printf(".___________________.\n");
-            printf("SIZE      FILENAME\n"); // не более 10 символов на размер
+            printf("SIZE      FILENAME\n"); // no more than 10 characters per size
             for (uint64 j = 0; j < fCounts; ++j) {
                 printf("%s  %s\n", sizeToStr(Files[j].size), Files[j].name);
             }
@@ -341,7 +336,7 @@ void fGetContent(char **filenames, uint64 fCount, char skip) {
     }
 }
 
-// Архивация
+// Archiving
 void fArcData(char **filenames, uint64 fCount) {
     char * arcName = uniqName();
     if (arcName[0] == '\0') {
@@ -350,28 +345,28 @@ void fArcData(char **filenames, uint64 fCount) {
         exit(1);
     }
     FILE *archive = fopen(arcName, "w");
-    fwrite(&fCount, sizeof(uint64), 1, archive); // запись числа фалов
-    for (uint64 i = 0; i < fCount; ++i) { // проход по файлам
+    fwrite(&fCount, sizeof(uint64), 1, archive); // recording the number of files
+    for (uint64 i = 0; i < fCount; ++i) { // walk through files
         int nameLen = 0;
         char *fileName = getName(filenames[i], &nameLen);
-        fwrite(&nameLen, sizeof(int), 1, archive); // запись длинны имени файла
-        fwrite(fileName, sizeof(char), nameLen, archive); // запись имени файла
+        fwrite(&nameLen, sizeof(int), 1, archive); // record length file name
+        fwrite(fileName, sizeof(char), nameLen, archive); // filename entry
         uint64 fileSize = 0;
         uchar *fileData = fRead(filenames[i], &fileSize, 0, 'w');
         uint64 encLen = 0; uchar uSize;
         printf("encoding\n");
-        uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // кодированные данные
+        uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // encoded data
         printf("encoded\n");
-        fwrite(&uSize, sizeof(uchar), 1, archive); // запись размера юнета
-        fwrite(&encLen, sizeof(uint64), 1, archive); // запись длины кодированных данных
+        fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
+        fwrite(&encLen, sizeof(uint64), 1, archive); // recording the length of encoded data
         if (uSize == 8) {
-            fwrite(&dataEnc, sizeof(uint64), encLen, archive); // запись данных
+            fwrite(&dataEnc, sizeof(uint64), encLen, archive); // data recording
         }
         if (uSize == 4) {
             unsigned int h;
             for (uint64 j = 0; j < encLen; ++j) {
                 h = (unsigned int)dataEnc[j];
-                fwrite(&h, sizeof(int), 1, archive); // запись данных
+                fwrite(&h, sizeof(int), 1, archive); // data recording
             }
         }
         free(dataEnc);
@@ -381,8 +376,8 @@ void fArcData(char **filenames, uint64 fCount) {
     fclose(archive);
 }
 
-// Разархивация
-// Гарантирует, что все файлы - файлы.mlz
+// Unzip
+// Ensures that all files are .mlz files
 void fDArkData(char **filenames, uint64 fCount, char skip) {
     uint64 dirSize;
     for (uint64 i = 0; i < fCount; ++i) {
@@ -404,4 +399,4 @@ void fDArkData(char **filenames, uint64 fCount, char skip) {
 byte:           8                 4                       K                      1                     8                M*P
 image:   [count of files] [len of file name K][filename while char != '\0][size of code units P][size of code count M][M code units]
 repeat:  |    1        | |                               N times                                                                |
- */
+*/

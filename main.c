@@ -9,14 +9,14 @@
 
 enum workMode {wArchiving, wDearchiving, wInfo, wNone};
 
-// 0 в случае совпадения строк
+// 0 if strings match
 int strcmp(const char *s1, const char *s2) {
     for (int i = 0;; ++i) {
         if (s1[i] == '\0' && s2[i] == '\0') {
             return 0;
         }
         if (s1[i]!= s2[i]) {
-            return s1[i] - s2[i];
+            return 1;
         }
     }
 }
@@ -25,10 +25,10 @@ int strcmp(const char *s1, const char *s2) {
 int main(int argc, char **argv) {
     char **files = NULL;
     char workMod  = wNone;
-    int fileNames = -1; // Номер в списке аргументов с которого начинаются имена файлов
-    int fileCount = 0; // Количество файлов в списке
-    char skip = 0; // спрашивать что делать в случае ошибок
-    if (argc <= 1) { // запускаем консольный режим
+    int fileNames = -1; // The number in the argument list at which file names begin
+    int fileCount = 0; // Number of files in the list
+    char skip = 0; // ask what to do in case of errors
+    if (argc <= 1) { // launch console mode
         printf("Welcome to .mlw file archiver\n\n"
                "1 - Create archive. 2 - Show archive content. 3 - Extract files from the archive\n");
         char inp1;
@@ -60,14 +60,14 @@ int main(int argc, char **argv) {
             if (inp1 == 'y' || inp1 == 'Y') { break;}
             if (inp1 == 'n' || inp1 == 'N') { skip = 1; break;}
         } while (1);
-        files = (char **) malloc(sizeof(char **) * 256);
-        char *inp2 = malloc(sizeof(char) * 256);
-        printf("Enter the names of the files to be archived separated by newlines:\n");
+        files = (char **) malloc(sizeof(char **) * 257);
+        char *inp2 = malloc(sizeof(char) * 257);
+        printf("Enter the names of the files to be archived separated by newlines(no more than 256):\n");
         printf("When you're done, type 'e'\n");
         scanf("%s", inp2);
         fflush(stdin);
         while (inp2[0] != 'e' && inp2[1]!= '\0') {
-            if (workMod == wInfo || workMod == wDearchiving) { // проверка расширения
+            if (workMod == wInfo || workMod == wDearchiving) { // extension check
                 if (exCheck(inp2) == 0) {
                     if (skip == 0) {
                         fprintf(stderr, "This file has an invalid extension: %s\n", inp2);
@@ -77,12 +77,12 @@ int main(int argc, char **argv) {
                         } else {
                             scanf("%s", inp2);
                             fflush(stdin);
-                            continue; // не подошел по расширению
+                            continue; // did not fit the expansion
                         }
                     }
                 }
             }
-            if (fCheck(inp2) == 0) { // файл не найден
+            if (fCheck(inp2) == 0) { // file not found
                 if (skip == 0) {
                     fprintf(stderr, "This file already exists: %s\n", inp2);
                     fflush(stderr);
@@ -102,8 +102,8 @@ int main(int argc, char **argv) {
             scanf("%s", inp2);
         }
         printf("\n\n\n");
-    } else { // Работа с аргументами командной строки
-        for (int i = 1; i < argc; ++i) { // если поступило сразу несколько команд - будет выполнена последняя из них
+    } else { // working with command line arguments
+        for (int i = 1; i < argc; ++i) { // if several commands are received at once, the last one will be executed
             if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) { // выводим справку
                 printf("Usage:\n"
                        "PARAMETER         DESCRIPTION                                                           \n"
@@ -117,25 +117,29 @@ int main(int argc, char **argv) {
                        "                                                                      errors by default)\n");
                 return 0;
             }
-            if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--check") == 0) { // вернуть содержимое архива
+            if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--check") == 0) { // return archive contents
                 workMod = wInfo;
             }
-            if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--file") == 0) { // добавляем файл
+            if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--file") == 0) { // add the file
                 fileNames = i+1;
             }
-            if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--encode") == 0) { // режим кодирования
+            if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--encode") == 0) { // encoding mode
                 workMod = wArchiving;
             }
-            if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decode") == 0) { // режим декодирования
+            if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decode") == 0) { // decoding mode
                 workMod = wDearchiving;
             }
-            if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--skip") == 0) { // пропускать кодирование/декодирование для всех файлов с ошибками
+            if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--skip") == 0) { // skip encoding/decoding for all files with errors
                 skip = 1;
             }
         }
-        // исключение ошибок
+        // error elimination
         if (workMod == wNone) {
             fprintf(stderr, "Operating mode was not specified\n");
+            exit(1);
+        }
+        if (fileNames == -1) {
+            fprintf(stderr, "File names were not specified\n");
             exit(1);
         }
         files = malloc(sizeof(char *) * argc);
@@ -149,18 +153,18 @@ int main(int argc, char **argv) {
                     if (askUser() == 0) {
                         return 0;
                     } else {
-                        continue; // не найден
+                        continue; // not found
                     }
                 }
             } else {
-                if (workMod == wInfo || workMod == wDearchiving) { // проверка расширения
+                if (workMod == wInfo || workMod == wDearchiving) { // extension check
                     if (exCheck(argv[i]) == 0) {
                         if (skip == 0) {
                             fprintf(stderr, "This file has an invalid extension: %s\n", argv[i]);
                             if (askUser() == 0) {
                                 return 0;
                             } else {
-                                continue; // не подошел по расширению
+                                continue; // did not fit the expansion
                             }
                         }
                     }
@@ -176,17 +180,30 @@ int main(int argc, char **argv) {
             exit(1);
         }
     }
-    // работа с данными пользователя
-    if (workMod == wArchiving) { // архивация
+    // working with user data
+    if (workMod == wArchiving) {
         fArcData(files, fileCount);
     }
-    if (workMod == wDearchiving) { // разархивация
+    if (workMod == wDearchiving) {
         fDArkData(files, fileCount, skip);
     }
-    if (workMod == wInfo) { // проверка содержимого архива
+    if (workMod == wInfo) {
         fGetContent(files, fileCount, skip);
     }
     printf("\nComplete\n");
     return 0;
 }
-// докрутить безопасности на всем проекте (защита от переполнения типов)
+
+/*
+1.png
+21.pdf
+2638_27500.txt
+e
+
+archive.mlz
+e
+
+*/
+
+// Tasks:
+// 1. more variants for uSuze in file.c and LZW.c
