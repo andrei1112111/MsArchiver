@@ -19,13 +19,13 @@ void add_vertex(struct Vertex *root, struct Vertex *arrVertex, uint64 *lVertex, 
     uint64 i;
     struct Vertex *cur = root;
     for (i = 0; i < len_key; ++i) {
-        if (cur->pVertex[key[i]+1] == 0) {
+        if (cur->pVertex[key[i] + 1] == 0) {
             arrVertex[*lVertex].vertex_id = *lVertex;
-            for (int j = 0; j < 257; ++j) {arrVertex[*lVertex].pVertex[j] = 0;}
-            cur->pVertex[key[i]+1] = *lVertex;
+            for (int j = 1; j < 257; ++j) {arrVertex[*lVertex].pVertex[j] = 0;}
+            cur->pVertex[key[i] + 1] = *lVertex;
             *lVertex = *lVertex + 1;
         }
-        cur = &arrVertex[cur->pVertex[key[i]+1]];
+        cur = &arrVertex[cur->pVertex[key[i] + 1]];
     }
 }
 
@@ -35,13 +35,13 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
     unsigned int j;
     struct Vertex cur = root;
     for (uint64 i = 0; i < len_key; ++i) {
-        j = (uchar)key[i] + 1;
-        if (cur.pVertex[j] == 0) {
+        j = (uchar)key[i];
+        if (cur.pVertex[j + 1] == 0) {
             return 0;
         }
-        cur = arrVertex[cur.pVertex[j]];
+        cur = arrVertex[cur.pVertex[j + 1]];
     }
-    return (cur.vertex_id + 1);
+    return (cur.vertex_id);
 }
 
 
@@ -58,11 +58,11 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
     struct Vertex root;
     struct Vertex *arrVertex = malloc(sizeof(struct Vertex) * mem_for_vert);
     // предзаполнение корня всеми возможными символами (диапазон char)
-    for (int j = 0; j < 257; ++j) {root.pVertex[j] = 0;}
-    for (int i = 0; i < 256; ++i) {
+    for (int j = 1; j < 257; ++j) {root.pVertex[j] = 0;}
+    for (int i = 1; i < 257; ++i) {
         arrVertex[i].vertex_id = i;
-        for (int j = 0; j < 257; ++j) {arrVertex[i].pVertex[j] = 0;} // символ = номер символа в pVertex
-        root.pVertex[i+1] = i+1;
+        for (int j = 1; j < 257; ++j) {arrVertex[i].pVertex[j] = 0;} // символ = номер символа в pVertex
+        root.pVertex[i] = i;
     }
     // результат (жрет много памяти) // !FOR WORK! Возможно стоит сделать условие выбора разных типов, если предполагать что res_len <= in
     uint64 res_len = 0; uint64 res_mem_step = 4096; uint64 mem_for_res = 4096;
@@ -99,7 +99,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
                 }
             }
             // result.append(dictionary[key])
-            res[res_len] = find_vertex(root, arrVertex, key, (len_key-1))-2;
+            res[res_len] = find_vertex(root, arrVertex, key, (len_key-1))-1;
             ++res_len;
             // dictionary.append(key+input[inp_byte])
             add_vertex(&root, arrVertex, &lVertex, key, len_key);
@@ -118,7 +118,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
             }
         }
         // result.append(dictionary[key])
-        res[res_len] = (find_vertex(root, arrVertex, key, len_key)-2);
+        res[res_len] = (find_vertex(root, arrVertex, key, len_key)-1);
         ++res_len;
     }
     *result_len = res_len;
@@ -169,7 +169,7 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
             }
             len_entry = dict[input[inp_int]][0];
             for (uint64 i = 0; i < len_entry; ++i) {entry[i] = dict[input[inp_int]][i+1];}
-        } else if (input[inp_int] == dict_len) {
+        } else if (input[inp_int] == dict_len || input[inp_int] == dict_len + 1) { // input[inp_int] not in dict
             if ((len_key + 1) >= mem_for_entry) { // в entry памяти не хватит
                 mem_for_entry = mem_for_entry + entry_mem_step;
                 entry = realloc(entry, mem_for_entry * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
@@ -184,8 +184,9 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
             entry[len_entry] = key[0];
             ++len_entry;
         } else {
-            printf("bad code");
-            return 0;
+            printf("bad code %llu %llu ", input[inp_int], dict_len);
+            *result_len = res_len;
+            return res;
         }
         // памяти под (res + entry) в res не хватит
         if ((res_len + len_entry) >= mem_for_res) {
