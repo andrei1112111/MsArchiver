@@ -4,6 +4,7 @@
 #define uint64 unsigned long long int
 #define uchar unsigned char
 
+char isFile(const char *filename);
 char fCheck(const char *filename);
 char exCheck(const char *filename);
 char askUser(void);

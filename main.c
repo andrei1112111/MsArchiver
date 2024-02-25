@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
                 printf("Usage:\n"
                        "PARAMETER         DESCRIPTION                                                           \n"
                        "-h, --help        This help. (only this one will be printed)                            \n"
-                       "-f, --file         Input file. Multiple files separated by a space are allowed             \n"
+                       "-f, --file        Input file. Multiple files separated by a space are allowed             \n"
                        "-e, --encode      Input files will be compressed (Files with the .mlz extension will be  \n"
                        "                                             compressed. The rest will remain untouched)\n"
                        "-d, --decode      Input files will be decompressed                                       \n"
@@ -138,8 +138,11 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Operating mode was not specified\n");
             exit(1);
         }
-        files = (char **) malloc(sizeof(char **) * argc);
+        files = malloc(sizeof(char *) * argc);
         for (int i = fileNames; i < argc; ++i) {
+            if (isFile(argv[i]) == 0) {
+                continue;
+            }
             if (fCheck(argv[i]) == 0) {
                 if (skip == 0) {
                     fprintf(stderr, "This file was not found: %s\n", argv[i]);
@@ -162,9 +165,9 @@ int main(int argc, char **argv) {
                         }
                     }
                 }
-                int lf = 0; for (; argv[fileCount][lf] != '\0'; ++lf) {}
-                files[fileCount] = malloc(sizeof(char) * (lf + 1));
-                for (int ii = 0; ii < lf+1; ++ii) { files[fileCount][i] = argv[fileCount][i];}
+                int lf = 0; for (; argv[i][lf] != '\0'; ++lf) {}
+                files[i-fileNames] = malloc(sizeof(char) * (lf + 1));
+                for (int ii = 0; ii < lf+1; ++ii) { files[i-fileNames][ii] = argv[i][ii];}
                 ++fileCount;
             }
         }
@@ -187,6 +190,3 @@ int main(int argc, char **argv) {
     return 0;
 }
 // докрутить безопасности на всем проекте (защита от переполнения типов)
-
-// !!! test_files/1.txt
-// !!! archive.mlz

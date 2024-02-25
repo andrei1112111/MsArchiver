@@ -12,6 +12,16 @@ struct file {
     uint64 size;
 };
 
+char isFile(const char *filename) {
+    if (filename[0] == '-') {return 0;}
+    for (int i = 0; filename[i] != '\0'; i++) {
+        if (filename[i] == '.' && filename[i + 1] != '\0') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // Возвращает имя без пути и считает его длину
 char *getName(const char *filename, int *len) {
     int i,j = 0;
@@ -349,7 +359,9 @@ void fArcData(char **filenames, uint64 fCount) {
         uint64 fileSize = 0;
         uchar *fileData = fRead(filenames[i], &fileSize, 0, 'w');
         uint64 encLen = 0; uchar uSize;
+        printf("encoding\n");
         uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // кодированные данные
+        printf("encoded\n");
         fwrite(&uSize, sizeof(uchar), 1, archive); // запись размера юнета
         fwrite(&encLen, sizeof(uint64), 1, archive); // запись длины кодированных данных
         if (uSize == 8) {
