@@ -219,8 +219,8 @@ void fGetContent(char **filenames, uint64 fCount) {
             return;
         }
         printf("IN %s\n", filenames[i]);
-        printf(".___________________.\n");
-        printf("SIZE      FILENAME\n"); // no more than 10 characters per size
+        printf(".________________________________.\n");
+        printf("COMPRESSED      SIZE      FILENAME\n"); // no more than 10 characters per size
         fread(&fCounts, sizeof(uint64), 1, arcFile); // file count
         for (uint64 j = 0; j < fCounts; ++j) {
             fread(&nameLen, sizeof(int), 1, arcFile);
@@ -232,9 +232,10 @@ void fGetContent(char **filenames, uint64 fCount) {
             for (uint64 v = 0; v < N; ++v) {
                 fread(&hash, uSize, 1, arcFile); // file content
             }
-            printf("%s  %s\n", sizeToStr(N * uSize), nameFile);
+            char ch;if (uSize == 1) {ch = '-';} else {ch = '+';}
+            printf("%c               %s  %s\n", ch, sizeToStr(N * uSize), nameFile);
         }
-        printf(".___________________.\n");
+        printf(".________________________________.\n");
         fclose(arcFile);
     }
     free(nameFile);
@@ -276,13 +277,19 @@ void fArcData(char **filenames, uint64 fCount) {
         }
         fclose(file);
         uint64 encLen = 0; uchar uSize;
-        printf("encoding\n");
         uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // encoded data
-        printf("encoded\n");
-        fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
-        fwrite(&encLen, sizeof(uint64), 1, archive); // recording the length of encoded data
-        for (uint64 j = 0; j < encLen; ++j) {
-            fwrite(&dataEnc[j], uSize, 1, archive); // data recording
+        // если размер сжатой больше размера исходной - сохранять без сжатия
+        if ((encLen * uSize) >= fileSize) {
+            uSize = 1;
+            fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
+            fwrite(&fileSize, sizeof(uint64), 1, archive); // recording the length of data
+            fwrite(fileData, sizeof(uchar), fileSize, archive);
+        } else {
+            fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
+            fwrite(&encLen, sizeof(uint64), 1, archive); // recording the length of encoded data
+            for (uint64 j = 0; j < encLen; ++j) {
+                fwrite(&dataEnc[j], uSize, 1, archive); // data recording
+            }
         }
         free(dataEnc);
         free(fileData);
