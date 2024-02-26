@@ -7,15 +7,6 @@
 #define uint64 unsigned long long int
 #define uchar unsigned char
 
-struct file {
-    uchar *name;
-    uint64 size;
-};
-
-// convert 8 chars to uint64
-uint64 convert(const uchar* input) {
-    return *((uint64*)input);
-}
 
 // returns 1 when the input string is a file
 char isFile(const char *filename) {
@@ -143,21 +134,6 @@ char *sizeToStr(uint64 size){
     return str;
 }
 
-// Returns 1 if the user agrees to continue without the file, otherwise 0
-char askUser(void) {
-    while (1) {
-        char answer[1];
-        printf("Continue without this file?\n");
-        printf("Type (yes/no): ");
-        fflush(stdout);
-        scanf("%s", answer);
-        fflush(stdin);
-        if (answer[0] == 'y' || answer[0] == 'Y') {return 1;}
-        if (answer[0] == 'n' || answer[0] == 'N') {return 0;}
-    }
-}
-
-
 // Checks File Existence
 // 0 - does not exist, 1 - exists
 char fCheck(const char *filename) {
@@ -177,163 +153,91 @@ char exCheck(const char *filename) {
     return 0;
 }
 
-// the file will be opened and read
-// accepts the file name, a pointer to the file size, a pointer to the number of files in the archive and the operating mode
-// returns a pointer to the contents of the file
-uchar *fRead(const char *filename, volatile uint64 *fSize, volatile uint64 *dSize, char mode) {
-    FILE* file = fopen(filename, "r");
-    // reading file size
-    fseek(file, 0, SEEK_END);
-    *fSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    // reading file data
-    uchar *fData = malloc(sizeof(uchar) * *fSize);
-    fread(fData, sizeof(uchar), *fSize, file);
-    // error checking
-    if (ferror(file) != 0) {
-        fprintf(stderr, "Error reading file. ->fLoad\n");
-        return NULL;
-    }
-    fgetc(file);
-    if (feof(file) == 0) {
-        fprintf(stderr, "Failed to read file. ->fLoad\n");
-        return NULL;
-    }
-    fclose(file);
-    // count number of files (uint64)
-    if (mode == 'a') {
-        uchar N[8] = {fData[0], fData[1], fData[2], fData[3], fData[4], fData[5], fData[6], fData[7]}; // assembly uint64
-        *dSize = convert(N);
-    }
-    return fData;
-}
-
-// Returns a list of file name strings in the .mlz archive
-// size - list of file sizes in the .mlz archive. fCount - number of files in the .mlz archive.
-struct file *mlzGetNames(const char *filename, uint64 *fCount, char skip) {
-    uint64 start = 8; // start of file sequence
-    uint64 fSize = 0;
-    uchar uSize; // unit size of the component data code unit
-    uchar *content = fRead(filename, &fSize, fCount, 'a');
-    struct file *Files = malloc(sizeof(struct file) * (*fCount));
-    for (int i = 0; i < *fCount; ++i) { // cycle through files
-        if (content == NULL) {
-            if (skip == 0 && askUser() == 0) {
-                return NULL;
-            }
-        } else {
-            unsigned int N;
-            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // assembly uint length of file name
-            start += 4;
-            Files[i].name = malloc(sizeof(uchar) * (N + 1));
-            for (int j = 0; j < N; ++j) { // loop on file name characters
-                Files[i].name[j] = content[start + j];
-            }
-            Files[i].name[N] = '\0';
-            start += N;
-            uSize = content[start]; // unit size
-            start += 1;
-            uchar M[8] = {content[start + 0], content[start + 1], content[start + 2], content[start + 3],
-                          content[start + 4], content[start + 5], content[start + 6], content[start + 7]}; // assembly uint64
-            N = convert(M);
-            Files[i].size = N * uSize;
-            start += 8 + Files[i].size;
-        }
-    }
-    free(content);
-    return Files;
-}
-
 // Unzipping .mlz into a folder
 char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
-    uint64 fCount, fSize, dataSize, dataLen, nameLen;
+    uint64 fCount, dataLen;
+    unsigned int nameLen;
     uchar uSize; // unit size of the component data code unit
-    uint64 start = 8; // start of file sequence
     uchar *decoded;
     char *nameFile;
-    uchar *content = fRead(filename, &fSize, &fCount, 'a');
-    if (content == NULL) {
-        fprintf(stderr, "Error reading file. ->mlzGetData (%s)\n", filename);
+    FILE* fileMlz = fopen(filename, "rb");
+    // reading file data
+    // error checking
+    if (ferror(fileMlz) != 0) {
+        fprintf(stderr, "Error reading file. ->fLoad\n");
         return 0;
-    } else {
-        unsigned int N;
-        for (uint64 i = 0; i < fCount; ++i) {
-            N = (content[start + 3] << 24) | (content[start + 2] << 16) | (content[start + 1] << 8) | (content[start]); // assembly uint length of file name
-            start += 4;
-            nameLen = (N + 1);
-            nameFile = malloc(sizeof(uchar) * nameLen); // archive file
-            for (int j = 0; j < N; ++j) { // loop on file name characters
-                nameFile[j] = (char)content[start + j];
-            }
-            nameFile[N] = '\0';
-            start += N;
-            uSize = content[start]; // unit size
-            start += 1;
-            uchar M[8] = {content[start + 0], content[start + 1], content[start + 2], content[start + 3],
-                          content[start + 4], content[start + 5], content[start + 6], content[start + 7]}; // assembly uint64
-            N = convert(M);
-            dataSize = N * uSize;
-            start += 8;
-            // -------- to change |
-            uint64 *fileData = malloc(sizeof(uint64) * dataSize); // file content as uint64
-            uint64 kk = 0;
-            if (uSize == 4) {
-                for (;kk < N; ++kk) {
-                    fileData[kk] = (content[start + (kk * uSize) + 3] << 24) | (content[start + (kk * uSize) + 2] << 16) | (content[start + (kk * uSize) + 1] << 8) | (content[start + (kk * uSize)]);
-                }
-            } else {
-                for (; kk < N; ++kk) {
-                    uchar MM[8] = {content[start + kk + 0], content[start + kk + 1], content[start + kk + 2], content[start + kk + 3],
-                                  content[start + kk + 4], content[start + kk + 5], content[start + kk + 6], content[start + kk + 7]}; // assembly uint64
-                    fileData[kk] = convert(MM);
-                    }
-                }
-            decoded = lzwDecode(fileData, N, &dataLen);
-            // -------- to change /
-            start += (N * uSize);
-            if (decoded == NULL) {
-                fprintf(stderr, "Error decoding file. ->mlzGetData (%s)\n", filename);
-                return 0;
-            }
-            // write to file
-            char *path = malloc(sizeof(char) * (folderLen + nameLen + 2));
-            for (int k = 0; k < folderLen; ++k) {
-                path[k] = folder[k];
-            }
-            path[folderLen] = '/';
-            for (int k = 0; k < nameLen ; ++k) {
-                path[folderLen + 1 + k] = nameFile[k];
-            }
-            path[folderLen + 1 + nameLen] = '\0';
-            FILE *file = fopen(path, "w");
-            fwrite(decoded, sizeof(uchar), dataLen, file);
-            fclose(file);
-            free(decoded);
-            free(path);
-            free(nameFile);
-        }
-        free(content);
     }
+    fread(&fCount, sizeof(uint64), 1, fileMlz);
+    uint64 N;
+    for (uint64 i = 0; i < fCount; ++i) {
+        fread(&nameLen, sizeof(int), 1, fileMlz);
+        nameFile = malloc(sizeof(uchar) * (nameLen + 1)); // file
+        fread(nameFile, sizeof(uchar), nameLen, fileMlz); // filename
+        nameFile[nameLen] = '\0';
+        fread(&uSize, sizeof(uchar), 1, fileMlz); // unit size
+        fread(&N, sizeof(uint64), 1, fileMlz); // number of codes
+        uint64 *fileData = malloc(sizeof(uint64) * N); // file content as uint64
+        for (uint64 j = 0; j < N; ++j) {
+            fread(&fileData[j], uSize, 1, fileMlz); // file content
+        }
+        decoded = lzwDecode(fileData, N, &dataLen);
+        if (decoded == NULL) {
+            fprintf(stderr, "Error decoding file. ->mlzGetData (%s)\n", filename);
+            return 0;
+        }
+        char *path = malloc(sizeof(char) * (folderLen + nameLen + 2));
+        for (int k = 0; k < folderLen; ++k) {
+            path[k] = folder[k];
+        }
+        path[folderLen] = '/';
+        for (int k = 0; k < nameLen ; ++k) {
+            path[folderLen + 1 + k] = nameFile[k];
+        }
+        path[folderLen + 1 + nameLen] = '\0';
+        FILE *file = fopen(path, "w");
+        fwrite(decoded, sizeof(uchar), dataLen, file);
+        fclose(file);
+        free(decoded);
+        free(path);
+        free(nameFile);
+    }
+    fclose(fileMlz);
     return 1;
 }
 
 // Prints the contents of the specified .mlz file as a list of file sizes (compressed) and file names
 // Ensures that all files are .mlz files
-void fGetContent(char **filenames, uint64 fCount, char skip) {
-    struct file *Files = NULL; uint64 fCounts = 0;
+void fGetContent(char **filenames, uint64 fCount) {
+    uchar uSize, *nameFile; // unit size of the component data code unit
+    uint64 fCounts, N, hash;
+    unsigned int nameLen;
     for (uint64 i = 0; i < fCount; ++i) {
-        Files = mlzGetNames(filenames[i], &fCounts, skip);
-        if (Files != NULL) {
-            printf("IN %s\n", filenames[i]);
-            printf(".___________________.\n");
-            printf("SIZE      FILENAME\n"); // no more than 10 characters per size
-            for (uint64 j = 0; j < fCounts; ++j) {
-                printf("%s  %s\n", sizeToStr(Files[j].size), Files[j].name);
-            }
-            printf(".___________________.\n");
+        // file progressing
+        FILE* arcFile = fopen(filenames[i], "rb");
+        if (ferror(arcFile) != 0 || arcFile == NULL) { // error checking
+            fprintf(stderr, "Error reading file. ->fLoad\n");
+            return;
         }
-        free(Files);
+        printf("IN %s\n", filenames[i]);
+        printf(".___________________.\n");
+        printf("SIZE      FILENAME\n"); // no more than 10 characters per size
+        fread(&fCounts, sizeof(uint64), 1, arcFile); // file count
+        for (uint64 j = 0; j < fCounts; ++j) {
+            fread(&nameLen, sizeof(int), 1, arcFile);
+            nameFile = malloc(sizeof(uchar) * (nameLen + 1)); // file
+            fread(nameFile, sizeof(uchar), nameLen, arcFile); // filename
+            nameFile[nameLen] = '\0';
+            fread(&uSize, sizeof(uchar), 1, arcFile); // unit size
+            fread(&N, sizeof(uint64), 1, arcFile); // number of codes
+            for (uint64 v = 0; v < N; ++v) {
+                fread(&hash, uSize, 1, arcFile); // file content
+            }
+            printf("%s  %s\n", sizeToStr(N * uSize), nameFile);
+        }
+        printf(".___________________.\n");
+        fclose(arcFile);
     }
+    free(nameFile);
 }
 
 // Archiving
@@ -344,33 +248,45 @@ void fArcData(char **filenames, uint64 fCount) {
         fprintf(stderr, "Failed archive\n");
         exit(1);
     }
-    FILE *archive = fopen(arcName, "w");
+    FILE *archive = fopen(arcName, "wb");
     fwrite(&fCount, sizeof(uint64), 1, archive); // recording the number of files
     for (uint64 i = 0; i < fCount; ++i) { // walk through files
         int nameLen = 0;
         char *fileName = getName(filenames[i], &nameLen);
         fwrite(&nameLen, sizeof(int), 1, archive); // record length file name
         fwrite(fileName, sizeof(char), nameLen, archive); // filename entry
-        uint64 fileSize = 0;
-        uchar *fileData = fRead(filenames[i], &fileSize, 0, 'w');
+        uint64 fileSize;
+        FILE* file = fopen(filenames[i], "rb");
+        // reading file size
+        fseek(file, 0, SEEK_END);
+        fileSize = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        // reading file data
+        uchar *fileData = malloc(sizeof(uchar) * fileSize);
+        fread(fileData, sizeof(uchar), fileSize, file);
+        // error checking
+        if (ferror(file) != 0) {
+            fprintf(stderr, "Error reading file. ->fLoad\n");
+            return;
+        }
+        fgetc(file);
+        if (feof(file) == 0) {
+            fprintf(stderr, "Failed to read file. ->fLoad\n");
+            return;
+        }
+        fclose(file);
         uint64 encLen = 0; uchar uSize;
         printf("encoding\n");
         uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // encoded data
         printf("encoded\n");
         fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
         fwrite(&encLen, sizeof(uint64), 1, archive); // recording the length of encoded data
-        if (uSize == 8) {
-            fwrite(&dataEnc, sizeof(uint64), encLen, archive); // data recording
-        }
-        if (uSize == 4) {
-            unsigned int h;
-            for (uint64 j = 0; j < encLen; ++j) {
-                h = (unsigned int)dataEnc[j];
-                fwrite(&h, sizeof(int), 1, archive); // data recording
-            }
+        for (uint64 j = 0; j < encLen; ++j) {
+            fwrite(&dataEnc[j], uSize, 1, archive); // data recording
         }
         free(dataEnc);
         free(fileData);
+        free(fileName);
     }
     free(arcName);
     fclose(archive);
@@ -378,12 +294,12 @@ void fArcData(char **filenames, uint64 fCount) {
 
 // Unzip
 // Ensures that all files are .mlz files
-void fDArkData(char **filenames, uint64 fCount, char skip) {
+void fDArkData(char **filenames, uint64 fCount) {
     uint64 dirSize;
     for (uint64 i = 0; i < fCount; ++i) {
         printLB(i, fCount);
         char *dirname = mkDirectory(filenames[i], &dirSize);
-        if (dirname[0] == '\0' && skip == 0) {
+        if (dirname[0] == '\0') {
             fprintf(stderr, "Failed to create directory %s\n", filenames[i]);
             fprintf(stderr, "Skipping...\n");
         } else {

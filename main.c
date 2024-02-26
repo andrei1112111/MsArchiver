@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
     char workMod  = wNone;
     int fileNames = -1; // The number in the argument list at which file names begin
     int fileCount = 0; // Number of files in the list
-    char skip = 0; // ask what to do in case of errors
     if (argc <= 1) { // launch console mode
         printf("Welcome to .mlw file archiver\n\n"
                "1 - Create archive. 2 - Show archive content. 3 - Extract files from the archive\n");
@@ -51,15 +50,6 @@ int main(int argc, char **argv) {
                     break;
             }
         } while (workMod == wNone);
-        printf("Do you want to see warnings in case of errors?\n");
-        do {
-            printf("Type (yes/no): ");
-            fflush(stdout);
-            scanf("%s", &inp1);
-            fflush(stdin);
-            if (inp1 == 'y' || inp1 == 'Y') { break;}
-            if (inp1 == 'n' || inp1 == 'N') { skip = 1; break;}
-        } while (1);
         files = (char **) malloc(sizeof(char **) * 257);
         char *inp2 = malloc(sizeof(char) * 257);
         printf("Enter the names of the files to be archived separated by newlines(no more than 256):\n");
@@ -69,31 +59,19 @@ int main(int argc, char **argv) {
         while (inp2[0] != 'e' && inp2[1]!= '\0') {
             if (workMod == wInfo || workMod == wDearchiving) { // extension check
                 if (exCheck(inp2) == 0) {
-                    if (skip == 0) {
-                        fprintf(stderr, "This file has an invalid extension: %s\n", inp2);
-                        fflush(stderr);
-                        if (askUser() == 0) {
-                            return 0;
-                        } else {
-                            scanf("%s", inp2);
-                            fflush(stdin);
-                            continue; // did not fit the expansion
-                        }
-                    }
+                    fprintf(stderr, "This file has an invalid extension: %s\n", inp2);
+                    fflush(stderr);
+                    scanf("%s", inp2);
+                    fflush(stdin);
+                    continue; // did not fit the expansion
                 }
             }
             if (fCheck(inp2) == 0) { // file not found
-                if (skip == 0) {
-                    fprintf(stderr, "This file already exists: %s\n", inp2);
-                    fflush(stderr);
-                    if (askUser() == 0) {
-                        return 0;
-                    } else {
-                        scanf("%s", inp2);
-                        fflush(stdin);
-                        continue;
-                    }
-                }
+                fprintf(stderr, "This file already exists: %s\n", inp2);
+                fflush(stderr);
+                scanf("%s", inp2);
+                fflush(stdin);
+                continue;
             }
             int lf = 1; for (; inp2[lf] != '\0'; ++lf) {}
             files[fileCount] = malloc(sizeof(char) * (lf + 1));
@@ -112,9 +90,7 @@ int main(int argc, char **argv) {
                        "-e, --encode      Input files will be compressed (Files with the .mlz extension will be  \n"
                        "                                             compressed. The rest will remain untouched)\n"
                        "-d, --decode      Input files will be decompressed                                       \n"
-                       "-c, --check       Returns the contents of the archives. (works only for .mlz files)      \n"
-                       "-s, --skip        Skip compression/decompression for all files with errors. (warns about \n"
-                       "                                                                      errors by default)\n");
+                       "-c, --check       Returns the contents of the archives. (works only for .mlz files)      \n");
                 return 0;
             }
             if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--check") == 0) { // return archive contents
@@ -128,9 +104,6 @@ int main(int argc, char **argv) {
             }
             if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decode") == 0) { // decoding mode
                 workMod = wDearchiving;
-            }
-            if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--skip") == 0) { // skip encoding/decoding for all files with errors
-                skip = 1;
             }
         }
         // error elimination
@@ -148,25 +121,13 @@ int main(int argc, char **argv) {
                 continue;
             }
             if (fCheck(argv[i]) == 0) {
-                if (skip == 0) {
-                    fprintf(stderr, "This file was not found: %s\n", argv[i]);
-                    if (askUser() == 0) {
-                        return 0;
-                    } else {
-                        continue; // not found
-                    }
-                }
+                fprintf(stderr, "This file was not found: %s\n", argv[i]);
+                continue; // not found
             } else {
                 if (workMod == wInfo || workMod == wDearchiving) { // extension check
                     if (exCheck(argv[i]) == 0) {
-                        if (skip == 0) {
-                            fprintf(stderr, "This file has an invalid extension: %s\n", argv[i]);
-                            if (askUser() == 0) {
-                                return 0;
-                            } else {
-                                continue; // did not fit the expansion
-                            }
-                        }
+                        fprintf(stderr, "This file has an invalid extension: %s\n", argv[i]);
+                        continue; // did not fit the expansion
                     }
                 }
                 int lf = 0; for (; argv[i][lf] != '\0'; ++lf) {}
@@ -185,25 +146,11 @@ int main(int argc, char **argv) {
         fArcData(files, fileCount);
     }
     if (workMod == wDearchiving) {
-        fDArkData(files, fileCount, skip);
+        fDArkData(files, fileCount);
     }
     if (workMod == wInfo) {
-        fGetContent(files, fileCount, skip);
+        fGetContent(files, fileCount);
     }
     printf("\nComplete\n");
     return 0;
 }
-
-/*
-1.png
-21.pdf
-2638_27500.txt
-e
-
-archive.mlz
-e
-
-*/
-
-// Tasks:
-// 1. more variants for uSuze in file.c and LZW.c

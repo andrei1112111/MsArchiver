@@ -7,10 +7,9 @@
 char isFile(const char *filename);
 char fCheck(const char *filename);
 char exCheck(const char *filename);
-char askUser(void);
 
-void fGetContent(char **filenames, uint64 fCount, char skip);
+void fGetContent(char **filenames, uint64 fCount);
 void fArcData(char **filenames, uint64 fCount);
-void fDArkData(char **filenames, uint64 fCount, char skip);
+void fDArkData(char **filenames, uint64 fCount);
 
 #endif //MLZ_FILE_H

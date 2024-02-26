@@ -51,41 +51,52 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
 // Результат должен быть освобожден после
 uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize) {
     // определение строки-фразы
-    uint64 len_key = 0; uint64 key_mem_step = 256; uint64 mem_for_key = 256;
-    uchar *key = malloc(sizeof(uchar ) * mem_for_key);
+    uint64 len_key = 0;
+    uint64 key_mem_step = 256;
+    uint64 mem_for_key = 256;
+    uchar *key = malloc(sizeof(uchar) * mem_for_key);
     // определение дерева для хранения фраз
-    uint64 lVertex = 257; uint64 vert_mem_step = 8192; uint64 mem_for_vert = 8192;
+    uint64 lVertex = 257;
+    uint64 vert_mem_step = 8192;
+    uint64 mem_for_vert = 8192;
     struct Vertex root;
     struct Vertex *arrVertex = malloc(sizeof(struct Vertex) * mem_for_vert);
     // предзаполнение корня всеми возможными символами (диапазон char)
-    for (int j = 1; j < 257; ++j) {root.pVertex[j] = 0;}
+    for (int j = 1; j < 257; ++j) { root.pVertex[j] = 0; }
     for (int i = 1; i < 257; ++i) {
         arrVertex[i].vertex_id = i;
-        for (int j = 1; j < 257; ++j) {arrVertex[i].pVertex[j] = 0;} // символ = номер символа в pVertex
+        for (int j = 1; j < 257; ++j) { arrVertex[i].pVertex[j] = 0; } // символ = номер символа в pVertex
         root.pVertex[i] = i;
     }
     // результат (жрет много памяти) // !FOR WORK! Возможно стоит сделать условие выбора разных типов, если предполагать что res_len <= in
-    uint64 res_len = 0; uint64 res_mem_step = 4096; uint64 mem_for_res = 4096;
+    uint64 res_len = 0;
+    uint64 res_mem_step = 4096;
+    uint64 mem_for_res = 4096;
     uint64 *res = malloc(sizeof(uint64) * mem_for_res); // коды фраз, результат работы функции lzw_encode
 
     for (uint64 inp_byte = 0; inp_byte < size_inp; ++inp_byte) { // проход по байтам 'input'
         if ((len_key + 1) >= mem_for_key) { // в key памяти не хватит под добавление нового символа
             mem_for_key = mem_for_key + key_mem_step;
-            key = realloc(key, mem_for_key * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
+            key = realloc(key, mem_for_key * sizeof(uchar)); // NOLINT(*-suspicious-realloc-usage)
             if (key == NULL) {
                 fprintf(stderr, "Memory allocation error. ->lzw encoding ->for ->key\n");
-                free(arrVertex); free(key); free(res);
+                free(arrVertex);
+                free(key);
+                free(res);
                 exit(1);
             }
         }
-        key[len_key] = input[inp_byte]; ++len_key; // [key] = key+input[inp_byte]
+        key[len_key] = input[inp_byte];
+        ++len_key; // [key] = key+input[inp_byte]
         if (find_vertex(root, arrVertex, key, len_key) == 0) { // проверка (key+input[inp_byte]) не в dict
             if ((lVertex + 1) > mem_for_vert) { // память под дерево кончилась
                 mem_for_vert = mem_for_vert + vert_mem_step;
                 arrVertex = (struct Vertex *) realloc(arrVertex, mem_for_vert * sizeof(struct Vertex)); // NOLINT(*-suspicious-realloc-usage)
                 if (arrVertex == NULL) {
                     fprintf(stderr, "Memory allocation error. ->lzw encoding ->for ->arrVertex\n");
-                    free(arrVertex); free(key); free(res);
+                    free(arrVertex);
+                    free(key);
+                    free(res);
                     exit(1);
                 }
             }
@@ -94,17 +105,20 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
                 res = realloc(res, mem_for_res * sizeof(uint64)); // NOLINT(*-suspicious-realloc-usage)
                 if (res == NULL) {
                     fprintf(stderr, "Memory allocation error. ->lzw encoding ->for ->res\n");
-                    free(arrVertex); free(key); free(res);
+                    free(arrVertex);
+                    free(key);
+                    free(res);
                     exit(1);
                 }
             }
             // result.append(dictionary[key])
-            res[res_len] = find_vertex(root, arrVertex, key, (len_key-1))-1;
+            res[res_len] = find_vertex(root, arrVertex, key, (len_key - 1)) - 1;
             ++res_len;
             // dictionary.append(key+input[inp_byte])
             add_vertex(&root, arrVertex, &lVertex, key, len_key);
             // key = input[inp_byte]
-            key[0] = input[inp_byte]; len_key = 1;
+            key[0] = input[inp_byte];
+            len_key = 1;
         }
     }
     if (len_key != 0) { // key не пустой
@@ -113,19 +127,48 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
             res = realloc(res, mem_for_res * sizeof(uint64)); // NOLINT(*-suspicious-realloc-usage)
             if (res == NULL) {
                 fprintf(stderr, "Memory allocation error. ->lzw encoding ->main ->res\n");
-                free(arrVertex); free(key); free(res);
+                free(arrVertex);
+                free(key);
+                free(res);
                 exit(1);
             }
         }
         // result.append(dictionary[key])
-        res[res_len] = (find_vertex(root, arrVertex, key, len_key)-1);
+        res[res_len] = (find_vertex(root, arrVertex, key, len_key) - 1);
         ++res_len;
     }
     *result_len = res_len;
-    if (lVertex >= 4294967285) {
+//    if (lVertex >= 4294967285) {
+//        *uSize = 8;
+//    } else {
+//        *uSize = 4;
+//    }
+    uint64 maxS = 18446744073709551614;
+    if (lVertex >= maxS) {
+        printf("ПЕРЕПОЛНЕНИЕ ДЛИННЫ ВЕРТЕКСА");
+        free(arrVertex); free(key); free(res);
+        return NULL;
+    }
+    if (lVertex < maxS) {
         *uSize = 8;
-    } else {
+    }
+    if (lVertex < 72057594037927934) {
+        *uSize = 7;
+    }
+    if (lVertex < 281474976710654) {
+        *uSize = 6;
+    }
+    if (lVertex < 1099511627774) {
+        *uSize = 5;
+    }
+    if (lVertex < 4294967294) {
         *uSize = 4;
+    }
+    if (lVertex < 16777214) {
+        *uSize = 3;
+    }
+    if (lVertex < 65534) {
+        *uSize = 2;
     }
     free(arrVertex); free(key);
 //    printf("%lu %llu", sizeof(struct Vertex), res_len); !!!
