@@ -111,8 +111,9 @@ void printLB(uint64 cur, uint64 end) {
     for (char j = st; j < 10; ++j) {
         printf(" ");
     }
-    printf("| %llu/%llu\r", cur, end);
+    printf("| %llu/%llu", cur, end);
     fflush(stdout);
+    printf("\r");
 }
 
 // Converts file size in bytes to kb mb ...
@@ -155,10 +156,9 @@ char exCheck(const char *filename) {
 
 // Unzipping .mlz into a folder
 char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
-    uint64 fCount, dataLen;
+    uint64 fCount;
     unsigned int nameLen;
     uchar uSize; // unit size of the component data code unit
-    uchar *decoded;
     char *nameFile;
     FILE* fileMlz = fopen(filename, "rb");
     // reading file data
@@ -176,15 +176,6 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
         nameFile[nameLen] = '\0';
         fread(&uSize, sizeof(uchar), 1, fileMlz); // unit size
         fread(&N, sizeof(uint64), 1, fileMlz); // number of codes
-        uint64 *fileData = malloc(sizeof(uint64) * N); // file content as uint64
-        for (uint64 j = 0; j < N; ++j) {
-            fread(&fileData[j], uSize, 1, fileMlz); // file content
-        }
-        decoded = lzwDecode(fileData, N, &dataLen);
-        if (decoded == NULL) {
-            fprintf(stderr, "Error decoding file. ->mlzGetData (%s)\n", filename);
-            return 0;
-        }
         char *path = malloc(sizeof(char) * (folderLen + nameLen + 2));
         for (int k = 0; k < folderLen; ++k) {
             path[k] = folder[k];
@@ -195,9 +186,8 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
         }
         path[folderLen + 1 + nameLen] = '\0';
         FILE *file = fopen(path, "w");
-        fwrite(decoded, sizeof(uchar), dataLen, file);
+        lzwDecode(fileMlz, uSize, N, file);
         fclose(file);
-        free(decoded);
         free(path);
         free(nameFile);
     }
@@ -209,7 +199,7 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
 // Ensures that all files are .mlz files
 void fGetContent(char **filenames, uint64 fCount) {
     uchar uSize, *nameFile; // unit size of the component data code unit
-    uint64 fCounts, N, hash;
+    uint64 fCounts, N;
     unsigned int nameLen;
     for (uint64 i = 0; i < fCount; ++i) {
         // file progressing
@@ -229,8 +219,8 @@ void fGetContent(char **filenames, uint64 fCount) {
             nameFile[nameLen] = '\0';
             fread(&uSize, sizeof(uchar), 1, arcFile); // unit size
             fread(&N, sizeof(uint64), 1, arcFile); // number of codes
-            for (uint64 v = 0; v < N; ++v) {
-                fread(&hash, uSize, 1, arcFile); // file content
+            for (int k = 0; k < uSize; ++k) {
+                fseek(arcFile, (long)N, SEEK_CUR);
             }
             char ch;if (uSize == 1) {ch = '-';} else {ch = '+';}
             printf("%c               %s  %s\n", ch, sizeToStr(N * uSize), nameFile);
@@ -262,23 +252,18 @@ void fArcData(char **filenames, uint64 fCount) {
         fseek(file, 0, SEEK_END);
         fileSize = ftell(file);
         fseek(file, 0, SEEK_SET);
-        // reading file data
-        uchar *fileData = malloc(sizeof(uchar) * fileSize);
-        fread(fileData, sizeof(uchar), fileSize, file);
-        // error checking
         if (ferror(file) != 0) {
             fprintf(stderr, "Error reading file. ->fLoad\n");
             return;
         }
-        fgetc(file);
-        if (feof(file) == 0) {
-            fprintf(stderr, "Failed to read file. ->fLoad\n");
-            return;
-        }
+        // reading file data
+        uchar *fileData = malloc(sizeof(uchar) * fileSize);
+        fread(fileData, sizeof(uchar), fileSize, file);
+        // error checking
         fclose(file);
         uint64 encLen = 0; uchar uSize;
-        uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize); // encoded data
-        // если размер сжатой больше размера исходной - сохранять без сжатия
+        uint64 *dataEnc = lzwEncode(fileData, fileSize, &encLen, &uSize, fileSize*100, fileSize); // encoded data
+        // if the compressed size is larger than the original size, save without compression
         if ((encLen * uSize) >= fileSize) {
             uSize = 1;
             fwrite(&uSize, sizeof(uchar), 1, archive); // record unit size
@@ -294,7 +279,9 @@ void fArcData(char **filenames, uint64 fCount) {
         free(dataEnc);
         free(fileData);
         free(fileName);
+        printLB(i, fCount);
     }
+    printLB(fCount, fCount);
     free(arcName);
     fclose(archive);
 }

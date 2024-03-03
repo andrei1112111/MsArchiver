@@ -44,21 +44,36 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
     return (cur.vertex_id);
 }
 
-
+// max_dict_size максимальное число добавленных вершин N (реальный размер: (2064)*(512+N))
+// max_dict_size = 0 - максимальный размер не ограничен
+// start_dict_size: начальный размер дерева N (реальный размер: (2064)*(512+N)), (2064)*(start_dict_size + 512) - по умолчанию
+// start_dict_size = 0 - минимальный размер по умолчанию
 // lzw для байтовых последовательностей (сжатие при помощи префиксного дерева)
 // максимальный размер входных данных - (18 446 744 073 709 551 615 байт) == (16,7 терабайта)
 // возвращает массив 'чисел' - кодов всех (без потерь) фраз
 // Результат должен быть освобожден после
-uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize) {
+uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize, uint64 max_dict_size, uint64 start_dict_size) {
     // определение строки-фразы
     uint64 len_key = 0;
-    uint64 key_mem_step = 256;
-    uint64 mem_for_key = 256;
+    uint64 key_mem_step = 1024;
+    uint64 mem_for_key = 1024;
     uchar *key = malloc(sizeof(uchar) * mem_for_key);
     // определение дерева для хранения фраз
     uint64 lVertex = 257;
-    uint64 vert_mem_step = 8192;
-    uint64 mem_for_vert = 8192;
+    uint64 vert_mem_step;
+    uint64 mem_for_vert;
+    if (start_dict_size == 0) {
+        mem_for_vert = 512;
+    } else {
+        mem_for_vert = 512 + start_dict_size;
+    }
+    uint64 MAX_VERTEX_SIZE = 0;
+    if (max_dict_size != 0) {
+        MAX_VERTEX_SIZE = start_dict_size + 512 + max_dict_size;
+        vert_mem_step = MAX_VERTEX_SIZE / 4;
+    } else {
+        vert_mem_step = mem_for_vert;
+    }
     struct Vertex root;
     struct Vertex *arrVertex = malloc(sizeof(struct Vertex) * mem_for_vert);
     // предзаполнение корня всеми возможными символами (диапазон char)
@@ -115,7 +130,9 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
             res[res_len] = find_vertex(root, arrVertex, key, (len_key - 1)) - 1;
             ++res_len;
             // dictionary.append(key+input[inp_byte])
-            add_vertex(&root, arrVertex, &lVertex, key, len_key);
+            if (MAX_VERTEX_SIZE == 0 || mem_for_vert < MAX_VERTEX_SIZE) {
+                add_vertex(&root, arrVertex, &lVertex, key, len_key);
+            }
             // key = input[inp_byte]
             key[0] = input[inp_byte];
             len_key = 1;
@@ -171,7 +188,6 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
         *uSize = 2;
     }
     free(arrVertex); free(key);
-//    printf("%lu %llu", sizeof(struct Vertex), res_len); !!!
     return res;
 }
 
@@ -179,7 +195,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
 // lzw для байтовых последовательностей (Декодирование при помощи Массива строк)
 // принимает последовательность чисел-кодов и возвращает исходную последовательность (без потерь)
 // Результат должен быть освобожден после
-uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len) {
+void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
     // определение 'строки'-ключа
     uint64 len_key; uint64 key_mem_step = 4096; uint64 mem_for_key = 4096;
     uchar *key = malloc(sizeof(uchar ) * mem_for_key);
@@ -191,32 +207,36 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
     uchar **dict = malloc(sizeof(uchar *) * mem_for_dict); // определение 'словаря'
     // заполнение словаря всевозможными значениями
     for (int i = 0; i < 256; ++i) { dict[i] = malloc(sizeof(uchar ) * 2) ; dict[i][0] = 1; dict[i][1] = (uchar )i;}
-    // результат (непонятно сколько памяти держать под каждое значение (типа тип инта))
-    uint64 res_len = 0; uint64 res_mem_step = 4096; uint64 mem_for_res = 4096;
-    uchar *res = malloc(sizeof(uchar ) * mem_for_res); // сжатая последовательность
-
-    key[0] = (uchar )input[0]; len_key = 1;
-    res[res_len] = (uchar )input[0];
-    ++res_len;
+    uint64 current = 0;
+    fread(&current, uInpSize, 1, input);
+    key[0] = (uchar )current; len_key = 1;
+    uchar hash = (uchar )current;
+    fwrite(&hash, sizeof(uchar), 1, output);
     for (uint64 inp_int = 1; inp_int < size_inp; ++inp_int) { // проход по int of 'input'
-        if (input[inp_int] < dict_len) { // input[inp_int] in dict
-            if ((dict[input[inp_int]][0]) >= mem_for_entry) { // в entry памяти не хватит
-                while ((dict[input[inp_int]][0]) >= mem_for_entry) {
+        current = 0;
+        fread(&current, uInpSize, 1, input);
+        if (current < dict_len) { // input[inp_int] in dict
+            if ((dict[current][0]) >= mem_for_entry) { // в entry памяти не хватит
+                while ((dict[current][0]) >= mem_for_entry) {
                     mem_for_entry = mem_for_entry + entry_mem_step;
                 }
                 entry = realloc(entry, mem_for_entry * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
                 if (entry == NULL) {
+                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                    free(key); free(dict);
                     fprintf(stderr, "Memory allocation error. ->lzw decoding -> entry\n");
                     exit(1);
                 }
             }
-            len_entry = dict[input[inp_int]][0];
-            for (uint64 i = 0; i < len_entry; ++i) {entry[i] = dict[input[inp_int]][i+1];}
-        } else if (input[inp_int] == dict_len || input[inp_int] == dict_len + 1) { // input[inp_int] not in dict
+            len_entry = dict[current][0];
+            for (uint64 i = 0; i < len_entry; ++i) {entry[i] = dict[current][i+1];}
+        } else if (current == dict_len || current == dict_len + 1) { // input[inp_int] not in dict
             if ((len_key + 1) >= mem_for_entry) { // в entry памяти не хватит
                 mem_for_entry = mem_for_entry + entry_mem_step;
                 entry = realloc(entry, mem_for_entry * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
                 if (entry == NULL) {
+                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                    free(key); free(dict);
                     fprintf(stderr, "Memory allocation error. ->lzw decoding -> entry\n");
                     exit(1);
                 }
@@ -227,29 +247,21 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
             entry[len_entry] = key[0];
             ++len_entry;
         } else {
-            printf("bad code %llu %llu ", input[inp_int], dict_len);
-            *result_len = res_len;
-            return res;
-        }
-        // памяти под (res + entry) в res не хватит
-        if ((res_len + len_entry) >= mem_for_res) {
-            while ((res_len + len_entry) >= mem_for_res) {mem_for_res = mem_for_res + res_mem_step;}
-            res = realloc(res, mem_for_res * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
-            if (res == NULL) {
-                fprintf(stderr, "Memory allocation error. ->lzw decoding -> res\n");
-                exit(1);
-            }
+            printf("bad code %llu %llu ", current, dict_len);
+            for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+            free(entry); free(key); free(dict);
+            return ;
         }
         for (uint64 i = 0; i < len_entry; ++i) { // res += entry
-            res[res_len+i] = entry[i];
+            fwrite(&entry[i], sizeof(uchar), 1, output);
         }
-        res_len += len_entry;
         // в словаре не хватит места под +1 запись
         if ((dict_len + 1) > mem_for_dict) { // память под словарь кончилась
             mem_for_dict = mem_for_dict + dict_mem_step;
             dict = (uchar **) realloc(dict, mem_for_dict * sizeof(uchar *)); // NOLINT(*-suspicious-realloc-usage)
             if (dict == NULL) {
                 fprintf(stderr, "Memory allocation error. ->lzw decoding -> dict\n");
+                free(entry); free(key);
                 exit(1);
             }
         }
@@ -265,6 +277,8 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
             while (len_entry >= mem_for_key) {mem_for_key = mem_for_key + key_mem_step;}
             key = realloc(key, mem_for_key * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
             if (key == NULL) {
+                for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                free(entry); free(dict);
                 fprintf(stderr, "Memory allocation error. ->lzw decoding -> key\n");
                 exit(1);
             }
@@ -273,8 +287,6 @@ uchar *lzwDecode(const uint64 *input, const uint64 size_inp, uint64 *result_len)
         for (uint64 i = 0; i < len_entry; ++i) {key[i] = entry[i];}
         len_key = len_entry;
     }
-    *result_len = res_len;
     for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
     free(entry); free(key); free(dict);
-    return res;
 }
