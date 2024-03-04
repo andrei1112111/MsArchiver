@@ -303,7 +303,6 @@ void fDArkData(char **filenames, uint64 fCount) {
     }
     printLB(fCount, fCount);
 }
-
 /*
   .mlz file content format:
 byte:           8                 4                       K                      1                     8                M*P

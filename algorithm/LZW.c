@@ -4,17 +4,17 @@
 #define uint64 unsigned long long int
 #define uchar unsigned char
 
-// https://ru.wikipedia.org/wiki/Алгоритм_Лемпеля_—_Зива_—_Велча
+// https://en.wikipedia.org/wiki/Lempel–Ziv–Welch
 
-// сжатие реализованно при помощи префиксного дерева
-// vertex_id - индекс в массиве ('порядковый номер' фразы в списке всех фраз)
-// pVertex - список возможных 'путей'
+// compression is implemented using a prefix tree
+// vertex_id - index in the array ('ordinal number' of the phrase in the list of all phrases)
+// pVertex - list of possible 'paths'
 struct Vertex { // 2064 байт
     uint64 vertex_id;
     uint64 pVertex[257];
 };
 
-// добавление 'фразы' в дерево
+// adding phrase to the tree
 void add_vertex(struct Vertex *root, struct Vertex *arrVertex, uint64 *lVertex, const uchar *key, const uint64 len_key) {
     uint64 i;
     struct Vertex *cur = root;
@@ -29,8 +29,8 @@ void add_vertex(struct Vertex *root, struct Vertex *arrVertex, uint64 *lVertex, 
     }
 }
 
-// поиск 'фразы' в дереве
-// возвращает индекс в массиве ('порядковый номер' фразы в списке всех фраз) (фразы не нашлось - (0), нашлась - (номер + 1))
+// search for 'phrase' in the tree
+// returns the index in the array (the 'ordinal number' of the phrase in the list of all phrases) (the phrase was not found - (0), found - (number + 1))
 uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *key, const uint64 len_key) {
     unsigned int j;
     struct Vertex cur = root;
@@ -44,14 +44,14 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
     return (cur.vertex_id);
 }
 
-// max_dict_size максимальное число добавленных вершин N (реальный размер: (2064)*(512+N))
-// max_dict_size = 0 - максимальный размер не ограничен
-// start_dict_size: начальный размер дерева N (реальный размер: (2064)*(512+N)), (2064)*(start_dict_size + 512) - по умолчанию
-// start_dict_size = 0 - минимальный размер по умолчанию
-// lzw для байтовых последовательностей (сжатие при помощи префиксного дерева)
-// максимальный размер входных данных - (18 446 744 073 709 551 615 байт) == (16,7 терабайта)
-// возвращает массив 'чисел' - кодов всех (без потерь) фраз
-// Результат должен быть освобожден после
+// max_dict_size the maximum number of added vertices N (actual size: (2064)*(512+N))
+// max_dict_size = 0 - maximum size is not limited
+// start_dict_size: initial tree size N (actual size: (2064)*(512+N)), (2064)*(start_dict_size + 512) - default
+// start_dict_size = 0 - default minimum size
+// lzw for byte sequences (prefix tree compression)
+// maximum input data size - (18,446,744,073,709,551,615 bytes) == (16.7 terabytes)
+// returns an array of 'numbers' - codes of all (lossless) phrases
+// The result should be freed after
 uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize, uint64 max_dict_size, uint64 start_dict_size) {
     // определение строки-фразы
     uint64 len_key = 0;
@@ -76,21 +76,21 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
     }
     struct Vertex root;
     struct Vertex *arrVertex = malloc(sizeof(struct Vertex) * mem_for_vert);
-    // предзаполнение корня всеми возможными символами (диапазон char)
+    // prefilling the root with all possible characters (char range)
     for (int j = 1; j < 257; ++j) { root.pVertex[j] = 0; }
     for (int i = 1; i < 257; ++i) {
         arrVertex[i].vertex_id = i;
         for (int j = 1; j < 257; ++j) { arrVertex[i].pVertex[j] = 0; } // символ = номер символа в pVertex
         root.pVertex[i] = i;
     }
-    // результат (жрет много памяти) // !FOR WORK! Возможно стоит сделать условие выбора разных типов, если предполагать что res_len <= in
+    // result (consumes a lot of memory) // !FOR WORK! It might be worth making a condition for selecting different types, assuming that res_len <= in
     uint64 res_len = 0;
     uint64 res_mem_step = 4096;
     uint64 mem_for_res = 4096;
-    uint64 *res = malloc(sizeof(uint64) * mem_for_res); // коды фраз, результат работы функции lzw_encode
+    uint64 *res = malloc(sizeof(uint64) * mem_for_res); // phrase codes, the result of the lzw_encode function
 
-    for (uint64 inp_byte = 0; inp_byte < size_inp; ++inp_byte) { // проход по байтам 'input'
-        if ((len_key + 1) >= mem_for_key) { // в key памяти не хватит под добавление нового символа
+    for (uint64 inp_byte = 0; inp_byte < size_inp; ++inp_byte) { // iterate over input bytes
+        if ((len_key + 1) >= mem_for_key) { // there is not enough memory in key to add a new character
             mem_for_key = mem_for_key + key_mem_step;
             key = realloc(key, mem_for_key * sizeof(uchar)); // NOLINT(*-suspicious-realloc-usage)
             if (key == NULL) {
@@ -103,8 +103,8 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
         }
         key[len_key] = input[inp_byte];
         ++len_key; // [key] = key+input[inp_byte]
-        if (find_vertex(root, arrVertex, key, len_key) == 0) { // проверка (key+input[inp_byte]) не в dict
-            if ((lVertex + 1) > mem_for_vert) { // память под дерево кончилась
+        if (find_vertex(root, arrVertex, key, len_key) == 0) { // check key input inp_byte not in dict
+            if ((lVertex + 1) > mem_for_vert) { // memory under the tree is over
                 mem_for_vert = mem_for_vert + vert_mem_step;
                 arrVertex = (struct Vertex *) realloc(arrVertex, mem_for_vert * sizeof(struct Vertex)); // NOLINT(*-suspicious-realloc-usage)
                 if (arrVertex == NULL) {
@@ -115,7 +115,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
                     exit(1);
                 }
             }
-            if ((res_len + 1) > mem_for_res) { // память под результат кончилась
+            if ((res_len + 1) > mem_for_res) { // the memory for the result has run out
                 mem_for_res = mem_for_res + res_mem_step;
                 res = realloc(res, mem_for_res * sizeof(uint64)); // NOLINT(*-suspicious-realloc-usage)
                 if (res == NULL) {
@@ -138,8 +138,8 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
             len_key = 1;
         }
     }
-    if (len_key != 0) { // key не пустой
-        if ((res_len + 1) > mem_for_res) { // память под результат кончилась
+    if (len_key != 0) {
+        if ((res_len + 1) > mem_for_res) { // the memory for the result has run out
             mem_for_res = mem_for_res + res_mem_step;
             res = realloc(res, mem_for_res * sizeof(uint64)); // NOLINT(*-suspicious-realloc-usage)
             if (res == NULL) {
@@ -155,11 +155,6 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
         ++res_len;
     }
     *result_len = res_len;
-//    if (lVertex >= 4294967285) {
-//        *uSize = 8;
-//    } else {
-//        *uSize = 4;
-//    }
     uint64 maxS = 18446744073709551614;
     if (lVertex >= maxS) {
         printf("ПЕРЕПОЛНЕНИЕ ДЛИННЫ ВЕРТЕКСА");
@@ -191,51 +186,57 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
     return res;
 }
 
+// String data type (len of string <= 65535)
+typedef struct String {
+    unsigned short int len;
+    uchar *str;
+} String;
 
-// lzw для байтовых последовательностей (Декодирование при помощи Массива строк)
-// принимает последовательность чисел-кодов и возвращает исходную последовательность (без потерь)
-// Результат должен быть освобожден после
+
+// lzw for byte sequences (Decoding using String Array)
+// accepts a sequence of code numbers and returns the original sequence (without loss)
+// The result should be freed after
 void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
-    // определение 'строки'-ключа
+    // defining a string key
     uint64 len_key; uint64 key_mem_step = 4096; uint64 mem_for_key = 4096;
     uchar *key = malloc(sizeof(uchar ) * mem_for_key);
-    // определение второй 'строки'-ключа
+    // defining the second string key
     uint64 len_entry; uint64 entry_mem_step = 4096; uint64 mem_for_entry = 4096;
     uchar *entry = malloc(sizeof(uchar ) * mem_for_entry);
-    // словарь состоит из длины (пока что первый байт) и самой последовательности далее
+    // the dictionary consists of the length (the first byte for now) and the sequence itself further
     uint64 dict_len = 256; uint64 dict_mem_step = 4096; uint64 mem_for_dict = 4096;
-    uchar **dict = malloc(sizeof(uchar *) * mem_for_dict); // определение 'словаря'
-    // заполнение словаря всевозможными значениями
-    for (int i = 0; i < 256; ++i) { dict[i] = malloc(sizeof(uchar ) * 2) ; dict[i][0] = 1; dict[i][1] = (uchar )i;}
+    String *dict = malloc(sizeof(String) * mem_for_dict); // definition of dictionary
+    // filling the dictionary with all possible meanings
+    for (int i = 0; i < 256; ++i) { dict[i].str = malloc(sizeof(uchar ) * 2) ; dict[i].len = 1; dict[i].str[0] = (uchar )i;}
     uint64 current = 0;
     fread(&current, uInpSize, 1, input);
     key[0] = (uchar )current; len_key = 1;
     uchar hash = (uchar )current;
     fwrite(&hash, sizeof(uchar), 1, output);
-    for (uint64 inp_int = 1; inp_int < size_inp; ++inp_int) { // проход по int of 'input'
+    for (uint64 inp_int = 1; inp_int < size_inp; ++inp_int) { // pass through int of input
         current = 0;
         fread(&current, uInpSize, 1, input);
         if (current < dict_len) { // input[inp_int] in dict
-            if ((dict[current][0]) >= mem_for_entry) { // в entry памяти не хватит
-                while ((dict[current][0]) >= mem_for_entry) {
+            if ((dict[current].len) >= mem_for_entry) { // there is not enough memory in entry
+                while ((dict[current].len) >= mem_for_entry) {
                     mem_for_entry = mem_for_entry + entry_mem_step;
                 }
                 entry = realloc(entry, mem_for_entry * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
                 if (entry == NULL) {
-                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i].str);}
                     free(key); free(dict);
                     fprintf(stderr, "Memory allocation error. ->lzw decoding -> entry\n");
                     exit(1);
                 }
             }
-            len_entry = dict[current][0];
-            for (uint64 i = 0; i < len_entry; ++i) {entry[i] = dict[current][i+1];}
+            len_entry = dict[current].len;
+            for (uint64 i = 0; i < len_entry; ++i) {entry[i] = dict[current].str[i];}
         } else if (current == dict_len || current == dict_len + 1) { // input[inp_int] not in dict
-            if ((len_key + 1) >= mem_for_entry) { // в entry памяти не хватит
+            if ((len_key + 1) >= mem_for_entry) { // there is not enough memory in entry
                 mem_for_entry = mem_for_entry + entry_mem_step;
                 entry = realloc(entry, mem_for_entry * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
                 if (entry == NULL) {
-                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i].str);}
                     free(key); free(dict);
                     fprintf(stderr, "Memory allocation error. ->lzw decoding -> entry\n");
                     exit(1);
@@ -248,17 +249,17 @@ void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
             ++len_entry;
         } else {
             printf("bad code %llu %llu ", current, dict_len);
-            for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+            for (uint64 i = 0; i < dict_len; ++i) {free(dict[i].str);}
             free(entry); free(key); free(dict);
             return ;
         }
         for (uint64 i = 0; i < len_entry; ++i) { // res += entry
             fwrite(&entry[i], sizeof(uchar), 1, output);
         }
-        // в словаре не хватит места под +1 запись
-        if ((dict_len + 1) > mem_for_dict) { // память под словарь кончилась
+        // there is not enough space in the dictionary for +1 entry
+        if ((dict_len + 1) > mem_for_dict) { // memory for the dictionary has run out
             mem_for_dict = mem_for_dict + dict_mem_step;
-            dict = (uchar **) realloc(dict, mem_for_dict * sizeof(uchar *)); // NOLINT(*-suspicious-realloc-usage)
+            dict = (String *) realloc(dict, mem_for_dict * sizeof(String)); // NOLINT(*-suspicious-realloc-usage)
             if (dict == NULL) {
                 fprintf(stderr, "Memory allocation error. ->lzw decoding -> dict\n");
                 free(entry); free(key);
@@ -266,18 +267,18 @@ void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
             }
         }
 //        dictionary[dict_size] = w + entry[0]
-        dict[dict_len] = malloc(sizeof(uchar ) * (len_key + 1 + 1));
-        dict[dict_len][0] = (char )(len_key + 1); // как раз слабый момент хранения длинны в нулевом байте (1.)
-        for (uint64 i = 0; i < len_key; ++i) {dict[dict_len][i+1] = key[i];}
-        dict[dict_len][1+len_key] = entry[0];
+        dict[dict_len].str = malloc(sizeof(uchar ) * (len_key + 1));
+        dict[dict_len].len = (unsigned short int)(len_key + 1);
+        for (uint64 i = 0; i < len_key; ++i) {dict[dict_len].str[i] = key[i];}
+        dict[dict_len].str[len_key] = entry[0];
         ++dict_len;
 
-        // памяти под entry в key не хватит
+        // there is not enough memory for entry in key
         if (len_entry >= mem_for_key) {
             while (len_entry >= mem_for_key) {mem_for_key = mem_for_key + key_mem_step;}
             key = realloc(key, mem_for_key * sizeof(uchar )); // NOLINT(*-suspicious-realloc-usage)
             if (key == NULL) {
-                for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+                for (uint64 i = 0; i < dict_len; ++i) {free(dict[i].str);}
                 free(entry); free(dict);
                 fprintf(stderr, "Memory allocation error. ->lzw decoding -> key\n");
                 exit(1);
@@ -287,6 +288,6 @@ void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
         for (uint64 i = 0; i < len_entry; ++i) {key[i] = entry[i];}
         len_key = len_entry;
     }
-    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i]);}
+    for (uint64 i = 0; i < dict_len; ++i) {free(dict[i].str);}
     free(entry); free(key); free(dict);
 }

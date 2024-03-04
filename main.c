@@ -116,8 +116,7 @@ int main(int argc, char **argv) {
                        "-e, --encode      Input files will be compressed (Files with the .mlz extension will be  \n"
                        "                                             compressed. The rest will remain untouched)\n"
                        "-d, --decode      Input files will be decompressed                                       \n"
-                       "-c, --check       Returns the contents of the archives. (works only for .mlz files)      \n"
-                       "    ---FILENAMES SHOULD BE WITHOUT SPACES---                                            \n");
+                       "-c, --check       Returns the contents of the archives. (works only for .mlz files)      \n");
                 return 0;
             }
             if (str_cmp(argv[i], "-c") == 1 || str_cmp(argv[i], "--check") == 1) { // return archive contents
