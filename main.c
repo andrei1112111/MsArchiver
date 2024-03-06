@@ -178,4 +178,4 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-// compression without max vertex size for 32mb .txt file takes 25 seconds | resulting size = 10 mb
+// compression without max vertex size for big(>15mb) files takes a long time(> 10 seconds)
