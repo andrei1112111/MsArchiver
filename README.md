@@ -56,12 +56,12 @@ Terminal Input:
 output ->
 ```sh
 IN archive.mlz
-.________________________________.
+.________________________________
 COMPRESSED      SIZE      FILENAME
 +               599 KB    Philosophers Stone.doc
 -               619 KB    Philosophers Stone.epub
 +               420 KB    Philosophers Stone.fb2
-.________________________________.
+.________________________________
 
 Complete
 ```

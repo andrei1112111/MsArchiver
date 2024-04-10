@@ -8,18 +8,15 @@
 #define uchar unsigned char
 
 
-// returns 1 when the input string is a file
-char isFile(const char *filename) {
-    if (filename[0] == '-') {return 0;}
-    for (int i = 0; filename[i] != '\0'; ++i) {
-        if (filename[i] == '.' && filename[i + 1] != '\0') {
-            return 1;
-        }
-    }
-    return 0;
-}
+typedef struct discriptions discriptions;
 
-// Returns the name without the path and calculates its length
+/**
+ * @brief Returns the name without the path and calculates its length
+ *
+ * @param filename The full path to the file
+ * @param len A pointer to an integer that will receive the length of the filename
+ * @return A pointer to a dynamically allocated string that contains the filename without the path
+ */
 char *getName(const char *filename, int *len) {
     int i,j = 0;
     for (i = 0; filename[i] != '\0'; ++i) {
@@ -36,7 +33,12 @@ char *getName(const char *filename, int *len) {
     return name;
 }
 
-// creating a folder with unique name
+/**
+ * @brief Creates a folder with a unique name.
+ * @param name The name of the folder to be created.
+ * @param folderLen A pointer to an integer that will receive the length of the unique name.
+ * @return A pointer to a string that represents the unique name of the folder. If the function fails to create the directory, it returns a null pointer.
+ */
 char *mkDirectory(const char *name, uint64 *folderLen) {
     int i = 0;
     for (; name[i] != '\0'; ++i) {}
@@ -72,7 +74,10 @@ char *mkDirectory(const char *name, uint64 *folderLen) {
     return newName;
 }
 
-// choosing a unique name for the archive
+/**
+ * @brief Chooses a unique name for the archive.
+ * @return A pointer to a string that represents the unique name of the archive. If the function fails to create the directory, it returns a null pointer.
+ */
 char *uniqName(void) {
     char *filename = malloc(sizeof(char) * 100);
     for (int i = 0; i < 13; ++i) {filename[i] = "archive.mlz\0"[i];}
@@ -101,7 +106,12 @@ char *uniqName(void) {
     return filename;
 }
 
-// печатает текущий статус обработки (10 степеней)
+/**
+ * @brief Prints the current status of processing (10 degrees).
+ *
+ * @param cur The current value.
+ * @param end The total value.
+ */
 void printLB(uint64 cur, uint64 end) {
     char st = (char) (cur / end * 10); // [0, ..., 10]
     printf("|");
@@ -116,8 +126,11 @@ void printLB(uint64 cur, uint64 end) {
     printf("\r");
 }
 
-// Converts file size in bytes to kb mb ...
-// Returns 11 characters (string length = 10)
+/**
+ * @brief Converts file size in bytes to kb mb ...
+ * @param size The size of the file in bytes.
+ * @return A pointer to a string that represents the size of the file in a human-readable format.
+ */
 char *sizeToStr(uint64 size){
     char syf[6][3] = {"B\0\0", "KB\0", "MB\0", "GB\0", "TB\0", "PB\0"};
     int i = 0;
@@ -135,8 +148,12 @@ char *sizeToStr(uint64 size){
     return str;
 }
 
-// Checks File Existence
-// 0 - does not exist, 1 - exists
+/**
+ * @brief Checks if a file exists.
+ *
+ * @param filename The full path to the file.
+ * @return 0 if the file does not exist, 1 otherwise.
+ */
 char fCheck(const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
@@ -144,7 +161,12 @@ char fCheck(const char *filename) {
     }
     return 1;
 }
-// 1 - .mlz archive, otherwise 0
+/**
+ * @brief Checks if a file is a .mlz archive.
+ *
+ * @param filename The full path to the file.
+ * @return 1 if the file is a .mlz archive, otherwise 0.
+ */
 char exCheck(const char *filename) {
     int i;
     for (i = 0; filename[i] != '\0'; ++i) {}
@@ -154,7 +176,14 @@ char exCheck(const char *filename) {
     return 0;
 }
 
-// Unzipping .mlz into a folder
+/**
+ * @brief Unzipping .mlz into a folder
+ *
+ * @param filename The full path to the .mlz file
+ * @param folder The full path to the destination folder
+ * @param folderLen The length of the destination folder path
+ * @return 1 if the unzipping process is successful, otherwise 0
+ */
 char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
     uint64 fCount;
     unsigned int nameLen;
@@ -195,8 +224,12 @@ char mlzGetData(const char *filename, const char *folder, uint64 folderLen) {
     return 1;
 }
 
-// Prints the contents of the specified .mlz file as a list of file sizes (compressed) and file names
-// Ensures that all files are .mlz files
+
+/**
+ * @brief Prints the contents of the specified .mlz file as a list of file sizes (compressed) and file names
+ * @param filenames The array of filenames
+ * @param fCount The number of files in the .mlz archive
+ */
 void fGetContent(char **filenames, uint64 fCount) {
     uchar uSize, *nameFile; // unit size of the component data code unit
     uint64 fCounts, N;
@@ -209,7 +242,7 @@ void fGetContent(char **filenames, uint64 fCount) {
             return;
         }
         printf("IN %s\n", filenames[i]);
-        printf(".________________________________.\n");
+        printf(".________________________________\n");
         printf("COMPRESSED      SIZE      FILENAME\n"); // no more than 10 characters per size
         fread(&fCounts, sizeof(uint64), 1, arcFile); // file count
         for (uint64 j = 0; j < fCounts; ++j) {
@@ -225,13 +258,17 @@ void fGetContent(char **filenames, uint64 fCount) {
             char ch;if (uSize == 1) {ch = '-';} else {ch = '+';}
             printf("%c               %s  %s\n", ch, sizeToStr(N * uSize), nameFile);
         }
-        printf(".________________________________.\n");
+        printf(".________________________________\n");
         fclose(arcFile);
     }
     free(nameFile);
 }
 
-// Archiving
+/**
+ * @brief Prints the contents of the specified .mlz file as a list of file sizes (compressed) and file names
+ * @param filenames The array of filenames
+ * @param fCount The number of files in the .mlz archive
+ */
 void fArcData(char **filenames, uint64 fCount) {
     char * arcName = uniqName();
     if (arcName[0] == '\0') {
@@ -286,8 +323,11 @@ void fArcData(char **filenames, uint64 fCount) {
     fclose(archive);
 }
 
-// Unzip
-// Ensures that all files are .mlz files
+/**
+ * @brief Unzip
+ * @param filenames The array of filenames
+ * @param fCount The number of files in the .mlz archive
+ */
 void fDArkData(char **filenames, uint64 fCount) {
     uint64 dirSize;
     for (uint64 i = 0; i < fCount; ++i) {
@@ -303,6 +343,7 @@ void fDArkData(char **filenames, uint64 fCount) {
     }
     printLB(fCount, fCount);
 }
+
 /*
   .mlz file content format:
 byte:           8                 4                       K                      1                     8                M*P

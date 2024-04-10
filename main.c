@@ -9,7 +9,16 @@
 
 enum workMode {wArchiving, wDearchiving, wInfo, wNone};
 
-// 1 if strings match
+/**
+ * @brief Compares two strings.
+ *
+ * This function compares two strings and returns 1 if they match, 0 otherwise.
+ *
+ * @param s1 The first string to compare.
+ * @param s2 The second string to compare.
+ *
+ * @return 1 if the strings match, 0 otherwise.
+ */
 int str_cmp(const char *s1, const char *s2) {
     for (int i = 0;; ++i) {
         if (s1[i] == '\0' && s2[i] == '\0') {
@@ -21,6 +30,17 @@ int str_cmp(const char *s1, const char *s2) {
     }
 }
 
+/**
+ * @brief Checks if a given string is present in a list of strings.
+ *
+ * This function checks if a given string is present in a list of strings.
+ *
+ * @param b The string to search for in the list.
+ * @param bs A list of strings to search in.
+ * @param bsLen The length of the list of strings.
+ *
+ * @return 1 if the string is found in the list, 0 otherwise.
+ */
 int b_in_bs(const char *b, char **bs, int bsLen) {
     for (int i = 0; i < bsLen; ++i) {
         if (str_cmp(b, bs[i]) == 1) {
@@ -178,5 +198,3 @@ int main(int argc, char **argv) {
     printf("\nComplete\n");
     return 0;
 }
-
-// compression without max vertex size for big(>15mb) files takes a long time(> 10 seconds)
