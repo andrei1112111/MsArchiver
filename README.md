@@ -3,6 +3,8 @@
 
 A simple cross-platform archiver with support for the native .mlz format. It can be used as a console utility with a simple user interface or without it.
 
+`.mlz` Archive can store files of any format. The compression is lossless. The archiver guarantees the possibility of full recovery of file data and its name with extension
+
 ⚠️ Tested only on linux and macOS.
 
 ## Features
@@ -16,12 +18,12 @@ A simple cross-platform archiver with support for the native .mlz format. It can
 * Files to compress:
     *  any formats.
 * Archives:
-    * only native .mlz.
+    * only native `.mlz`.
 
 
-## Deployment
+## Building
 
-To deploy this project run
+To Build this project run:
 
 ```sh
 gcc -o MsArchiver main.c algorithm/file.c algorithm/LZW.c -O2 -pthread
@@ -93,5 +95,21 @@ PARAMETER         DESCRIPTION
 -e, --encode      Input files will be compressed                                         
 -c, --check       Returns the contents of the archives. (works only for .mlz files)   
 ```
+
+
+### Start user interface mode
+Terminal Input:
+```sh
+./MsArchiver
+```
+
+## Results on the tests
+|                                                                    File / Files | Uncompressed Size | Compressed Size |
+|--------------------------------------------------------------------------------:|:-----------------:|:----------------|
+|                             [harry potter (3 books)](test_files/harry potter)   |      2.5 MB       | 1.7 MB          |
+|                                   [Voina i mir.fb2](test_files/voina i mir.fb2) |      9.5 MB       | 4 MB            |
+| [The Idiot. Fyodor Dostoyevsky.txt](test_files/The Idiot.FyodorDostoyevsky.txt) |      1.4 MB       | 714 KB          |
+|                                         [DSCF0879.RAF](test_files/DSCF0879.RAF) |      33.8 MB      | 21 MB           |
+
 ## Made with
 Compression algorithm based on [THIS ARTICLE](https://en.wikipedia.org/wiki/Lempel–Ziv–Welch).
