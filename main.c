@@ -112,10 +112,10 @@ int main(int argc, char **argv) {
                 printf("Usage:\n"
                        "PARAMETER         DESCRIPTION                                                           \n"
                        "-h, --help        This help. (only this one will be printed)                            \n"
-                       "-f, --file        Input file. Multiple files separated by a space are allowed             \n"
-                       "-e, --encode      Input files will be compressed (Files with the .mlz extension will be  \n"
-                       "                                             compressed. The rest will remain untouched)\n"
-                       "-d, --decode      Input files will be decompressed                                       \n"
+                       "-f, --file         Input file. Multiple files separated by a space are allowed             \n"
+                       "-d, --decode      Input files will be decompressed (Files with the .mlz extension        \n"
+                       "                     will be decompressed. The rest will remain untouched)              \n"
+                       "-e, --encode      Input files will be compressed                                         \n"
                        "-c, --check       Returns the contents of the archives. (works only for .mlz files)      \n");
                 return 0;
             }
@@ -174,7 +174,8 @@ int main(int argc, char **argv) {
     if (workMod == wInfo) {
         fGetContent(files, fileCount);
     }
-    printf("Complete\n");
+    fflush(stdout);
+    printf("\nComplete\n");
     return 0;
 }
 

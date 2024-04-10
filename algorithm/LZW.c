@@ -52,6 +52,17 @@ uint64 find_vertex(struct Vertex root, struct Vertex *arrVertex, const uchar *ke
 // maximum input data size - (18,446,744,073,709,551,615 bytes) == (16.7 terabytes)
 // returns an array of 'numbers' - codes of all (lossless) phrases
 // The result should be freed after
+/**
+ * @brief Lempel-Ziv-Welch (LZW) compression algorithm.
+ * @details This function uses a prefix tree to compress input data.
+ * @param[in] input A pointer to the input data.
+ * @param[in] size_inp The size of the input data.
+ * @param[out] result_len A pointer to the length of the compressed data.
+ * @param[out] uSize A pointer to the size of the compressed data in bytes.
+ * @param[in] max_dict_size The maximum number of added vertices.
+ * @param[in] start_dict_size The initial number of added vertices.
+ * @return A pointer to the compressed data, or NULL if memory allocation fails.
+ */
 uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len, uchar *uSize, uint64 max_dict_size, uint64 start_dict_size) {
     // определение строки-фразы
     uint64 len_key = 0;
@@ -83,7 +94,7 @@ uint64 *lzwEncode(const uchar *input, const uint64 size_inp, uint64 *result_len,
         for (int j = 1; j < 257; ++j) { arrVertex[i].pVertex[j] = 0; } // символ = номер символа в pVertex
         root.pVertex[i] = i;
     }
-    // result (consumes a lot of memory) // !FOR WORK! It might be worth making a condition for selecting different types, assuming that res_len <= in
+    // result (consumes a lot of memory) //
     uint64 res_len = 0;
     uint64 res_mem_step = 4096;
     uint64 mem_for_res = 4096;
@@ -193,9 +204,16 @@ typedef struct String {
 } String;
 
 
-// lzw for byte sequences (Decoding using String Array)
-// accepts a sequence of code numbers and returns the original sequence (without loss)
-// The result should be freed after
+/**
+ * @brief lzw for byte sequences (Decoding using String Array)
+ * @details accepts a sequence of code numbers and returns the original sequence (without loss)
+ * @param[in] input the input file pointer
+ * @param[in] uInpSize the size of the input data
+ * @param[in] size_inp the size of the input data in bytes
+ * @param[in,out] output the output file pointer
+ * @return none
+ * @note The result should be freed after
+ */
 void lzwDecode(FILE *input, int uInpSize, const uint64 size_inp, FILE *output) {
     // defining a string key
     uint64 len_key; uint64 key_mem_step = 4096; uint64 mem_for_key = 4096;
