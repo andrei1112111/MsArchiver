@@ -104,12 +104,12 @@ Terminal Input:
 ```
 
 ## Results on the tests
-|                                                                    File / Files | Uncompressed Size | Compressed Size |
-|--------------------------------------------------------------------------------:|:-----------------:|:----------------|
-|                             [harry potter (3 books)](test_files/harry potter)   |      2.5 MB       | 1.7 MB          |
-|                                   [Voina i mir.fb2](test_files/voina i mir.fb2) |      9.5 MB       | 4 MB            |
-| [The Idiot. Fyodor Dostoyevsky.txt](test_files/The Idiot.FyodorDostoyevsky.txt) |      1.4 MB       | 714 KB          |
-|                                         [DSCF0879.RAF](test_files/DSCF0879.RAF) |      33.8 MB      | 21 MB           |
+|                                                                       File / Files | Uncompressed Size | Compressed Size |
+|-----------------------------------------------------------------------------------:|:-----------------:|:----------------|
+|                                [harry potter (3 books)](test_files/harry%20potter) |      2.5 MB       | 1.7 MB          |
+|                                  [Voina i mir.fb2](test_files/voina%20i%20mir.fb2) |      9.5 MB       | 4 MB            |
+|  [The Idiot. Fyodor Dostoyevsky.txt](test_files/The%20Idiot.FyodorDostoyevsky.txt) |      1.4 MB       | 714 KB          |
+|                                            [DSCF0879.RAF](test_files/DSCF0879.RAF) |      33.8 MB      | 21 MB           |
 
 ## Made with
 Compression algorithm based on [THIS ARTICLE](https://en.wikipedia.org/wiki/Lempel–Ziv–Welch).
