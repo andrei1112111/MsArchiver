@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include "LZW.h"
@@ -18,18 +19,17 @@ typedef struct discriptions discriptions;
  * @return A pointer to a dynamically allocated string that contains the filename without the path
  */
 char *getName(const char *filename, int *len) {
-    int i,j = 0;
-    for (i = 0; filename[i] != '\0'; ++i) {
-        if (filename[i] == '/') {
-            j = i + 1;
-        }
-    }
-    char *name = malloc(sizeof(char) * (i - j + 1));
-    for (i = j; filename[i]!= '\0'; ++i) {
-        name[i - j] = filename[i];
-    }
-    name[i - j] = '\0';
-    *len = i - j;
+    /*For windows compilation define may used*/
+    #define slesh_char '/'
+    char *last_slesh_ptr = strrchr(filename, slesh_char);
+    size_t last_slesh_index = (size_t )(last_slesh_ptr - filename);
+    size_t present_len = strlen(filename);
+
+    size_t new_len = present_len - last_slesh_index + 1;
+    char *name = malloc(sizeof(char) * new_len);
+
+    strncpy(name, last_slesh_ptr, new_len);
+    *len = new_len;
     return name;
 }
 
@@ -40,19 +40,18 @@ char *getName(const char *filename, int *len) {
  * @return A pointer to a string that represents the unique name of the folder. If the function fails to create the directory, it returns a null pointer.
  */
 char *mkDirectory(const char *name, uint64 *folderLen) {
-    int i = 0;
-    for (; name[i] != '\0'; ++i) {}
-    i -= 4;
-    char *newName = malloc(sizeof(char) * (i + 2 + 6));
-    for (int j = 0; j < i; ++j) {newName[j] = name[j];}
-    newName[i] = '\0';
+    size_t name_len = strlen(name);
+    name_len -= 4;
+    char *newName = malloc(sizeof(char) * (name_len + 2 + 6));
+    for (size_t j = 0; j < name_len; ++j) {newName[j] = name[j];}
+    newName[name_len] = '\0';
     char ch[6] = "000000"; int c = 0;
     while (c < 1000 && mkdir(newName, 0777) == -1) {
-        newName[i] = '_';
+        newName[name_len] = '_';
         for (int j = 0; j < 5; ++j) {
-            newName[i + 1 + j] = ch[j];
+            newName[name_len + 1 + j] = ch[j];
         }
-        newName[i + 1 + 5] = '\0';
+        newName[name_len + 1 + 5] = '\0';
         ++ch[0];
         for (int z = 0; z < 5; ++z) {
             if (ch[z] > '9') {
@@ -67,9 +66,9 @@ char *mkDirectory(const char *name, uint64 *folderLen) {
         return newName;
     }
     if (c == 0) {
-        *folderLen = i;
+        *folderLen = name_len;
     } else {
-        *folderLen = i + 1 + 5;
+        *folderLen = name_len + 1 + 5;
     }
     return newName;
 }
@@ -80,7 +79,8 @@ char *mkDirectory(const char *name, uint64 *folderLen) {
  */
 char *uniqName(void) {
     char *filename = malloc(sizeof(char) * 100);
-    for (int i = 0; i < 13; ++i) {filename[i] = "archive.mlz\0"[i];}
+    strncpy(filename, "archive.mlz\0", 12);
+
     char ch[6] = "000000"; int c = 0;
     FILE* file = fopen(filename, "r");
     while (c < 1000 && file!= NULL) {
